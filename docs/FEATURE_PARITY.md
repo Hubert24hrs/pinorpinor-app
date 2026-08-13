@@ -251,10 +251,12 @@ the wrong thing to do.
 
 ## Summary
 
+117 features mapped:
+
 | Status | Count |
 | --- | --- |
-| COMPLETE | 71 |
-| PARTIAL | 10 |
+| COMPLETE | 96 |
+| PARTIAL | 9 |
 | NOT APPLICABLE | 11 |
 | BLOCKED | 1 |
 
