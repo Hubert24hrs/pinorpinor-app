@@ -55,7 +55,7 @@ void main() {
   /// A host with a button that opens the sheet, plus a signed-in session.
   Future<void> pumpHost(WidgetTester tester, {bool signedIn = true}) async {
     await tester.pumpRouted(
-      _SheetHost(userId: 'target-user', displayName: 'Zainab'),
+      const _SheetHost(userId: 'target-user', displayName: 'Zainab'),
       overrides: <Override>[
         ...fakeAuthOverrides(auth),
         safetyRepositoryProvider.overrideWithValue(safety),

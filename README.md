@@ -245,7 +245,15 @@ flutter test               # unit + widget
 flutter test integration_test/app_flow_test.dart   # needs a device/emulator
 ```
 
-Current state: **127 tests, all passing, analyzer clean.**
+Current state: **127 tests, all passing; analyzer clean; debug APK builds.**
+
+| Gate | Result |
+| --- | --- |
+| `flutter analyze` | No issues found |
+| `flutter test` | 127 passing |
+| `dart format .` | Clean |
+| `flutter build apk --debug` | `app-debug.apk` produced (95.9 MB, arm64) |
+| `flutter build appbundle --release` | Not run — needs the owner's `key.properties` |
 
 | Suite | Covers |
 | --- | --- |

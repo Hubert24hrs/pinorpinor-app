@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,7 +56,9 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
       final redirect = Uri.encodeComponent(
         AppRoutes.profileFor(widget.username),
       );
-      if (mounted) context.push('${AppRoutes.login}?redirect=$redirect');
+      // `push` returns the route's result; nothing here needs it, and awaiting
+      // it would hold this method open until the member finishes signing in.
+      unawaited(context.push('${AppRoutes.login}?redirect=$redirect'));
       return;
     }
 

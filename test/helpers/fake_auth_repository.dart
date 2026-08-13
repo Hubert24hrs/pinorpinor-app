@@ -43,7 +43,7 @@ class FakeAuthRepository extends AuthRepository {
   int signOutCalls = 0;
   int passwordResetRequests = 0;
 
-  static final AuthSession defaultSession = AuthSession(
+  static const AuthSession defaultSession = AuthSession(
     userId: 'test-user',
     email: 'member@example.com',
     username: 'member',

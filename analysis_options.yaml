@@ -1,28 +1,59 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
+# Static analysis configuration.
 #
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
+#   flutter analyze
+#
+# The baseline is `flutter_lints`. The additions below are the rules that catch
+# the mistakes this app can actually make: leaking a session or a payload into a
+# log, letting an unawaited future swallow an error, or reusing a BuildContext
+# after an await. Each one is treated as an error rather than a hint, because a
+# warning nobody reads is not a control.
 
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
-linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
-  rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+analyzer:
+  errors:
+    # Nothing in this app may print. Logging goes through AppLog, which is
+    # compiled out of release builds and never accepts a payload.
+    avoid_print: error
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+    # Using a BuildContext after an await is how a screen ends up talking to a
+    # disposed widget. It has already been caught twice here.
+    use_build_context_synchronously: error
+
+    # An unhandled future is a silently swallowed API error.
+    unawaited_futures: error
+
+    # Dead code and unused imports are usually the residue of a half-finished
+    # change; they should not survive review.
+    unused_import: error
+    unused_local_variable: error
+    dead_code: error
+
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+
+linter:
+  rules:
+    # Every dependency is injected through a provider, so an unawaited future is
+    # always a mistake rather than fire-and-forget by design. Where it genuinely
+    # is intentional, `unawaited(...)` says so explicitly.
+    unawaited_futures: true
+
+    # Const constructors matter on a list of profile cards that rebuilds on
+    # every scroll frame.
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+
+    prefer_final_locals: true
+    always_declare_return_types: true
+
+    # Catching a bare Error hides a programming mistake among the network ones.
+    avoid_catching_errors: true
+
+    # Deliberately NOT enabled: `avoid_redundant_argument_values`. Passing a
+    # value that happens to match a default is often the clearer choice —
+    # `Validators.phone(value, required: true)` at a call site where optionality
+    # is the point, or an explicit `now` in a date test. The rule would trade
+    # readable intent for a shorter line.

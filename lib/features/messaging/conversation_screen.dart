@@ -395,9 +395,9 @@ class _MessageBubble extends StatelessWidget {
                 if (message.failed) ...<Widget>[
                   GestureDetector(
                     onTap: onRetry,
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const <Widget>[
+                      children: <Widget>[
                         Icon(
                           Icons.refresh_rounded,
                           size: 12,

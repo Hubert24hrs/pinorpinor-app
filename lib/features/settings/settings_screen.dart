@@ -43,7 +43,7 @@ class SettingsScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
               children: <Widget>[
-                _SectionLabel(text: 'Notifications'),
+                const _SectionLabel(text: 'Notifications'),
                 _NotificationToggles(settings: data.settings),
 
                 const _SectionLabel(text: 'Discovery'),

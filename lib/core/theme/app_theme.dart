@@ -199,18 +199,18 @@ class AppTheme {
           fontWeight: FontWeight.w600,
         ),
       ),
-      chipTheme: ChipThemeData(
+      chipTheme: const ChipThemeData(
         backgroundColor: AppColors.bgMuted,
         selectedColor: AppColors.badgeRoseBg,
-        side: const BorderSide(color: AppColors.border),
-        labelStyle: const TextStyle(
+        side: BorderSide(color: AppColors.border),
+        labelStyle: TextStyle(
           fontFamily: sansFamily,
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: AppColors.textSecondary,
         ),
-        shape: const StadiumBorder(),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        shape: StadiumBorder(),
+        padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.bgSecondary,
@@ -298,17 +298,17 @@ class AppTheme {
         iconColor: AppColors.textSecondary,
         minVerticalPadding: 12,
       ),
-      tabBarTheme: TabBarThemeData(
+      tabBarTheme: const TabBarThemeData(
         labelColor: AppColors.rose,
         unselectedLabelColor: AppColors.textMuted,
         indicatorColor: AppColors.rose,
         dividerColor: AppColors.border,
-        labelStyle: const TextStyle(
+        labelStyle: TextStyle(
           fontFamily: sansFamily,
           fontWeight: FontWeight.w700,
           fontSize: 13.5,
         ),
-        unselectedLabelStyle: const TextStyle(
+        unselectedLabelStyle: TextStyle(
           fontFamily: sansFamily,
           fontWeight: FontWeight.w600,
           fontSize: 13.5,

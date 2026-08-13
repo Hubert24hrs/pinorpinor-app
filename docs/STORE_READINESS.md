@@ -163,10 +163,10 @@ Also declare: encrypted in transit; deletion available in-app; **no tracking**;
 
 | Item | Status | Evidence |
 | --- | --- | --- |
-| `flutter analyze` | DONE | 0 issues |
+| `flutter analyze` | DONE | 0 issues, with lints tightened beyond `flutter_lints` |
 | `flutter test` | DONE | 127 tests passing |
 | `dart format` | DONE | Clean |
-| Android debug APK | See § Build verification below | |
+| Android debug APK | DONE | `app-debug.apk`, 95,953,222 bytes, arm64 |
 | Android release `.aab` | OWNER — needs `key.properties` | Config in place; falls back to debug signing without it |
 | Signing config | DONE | Reads gitignored `key.properties` |
 | R8 / ProGuard | DONE | `android/app/proguard-rules.pro`; strips logging |
@@ -225,6 +225,20 @@ flutter test                       # expect: All tests passed
 flutter build apk --debug          # expect: app-debug.apk
 flutter build appbundle --release  # expect: app-release.aab, signed with the upload key
 ```
+
+Results from this repository:
+
+| Command | Result |
+| --- | --- |
+| `flutter analyze` | **No issues found** |
+| `flutter test` | **127 tests, all passing** |
+| `dart format .` | Clean |
+| `flutter build apk --debug --target-platform android-arm64` | **Succeeded** — `build/app/outputs/flutter-apk/app-debug.apk`, 95,953,222 bytes, in 1367s |
+| `flutter build appbundle --release` | **Not run** — needs `android/key.properties`, which only the owner can create |
+
+A debug APK is large because it carries the full Dart kernel and the debug
+engine. A release bundle with R8, resource shrinking and ABI/density splits is a
+fraction of it.
 
 ### On-device verification — NOT DONE, and why
 
