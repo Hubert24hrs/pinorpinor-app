@@ -1,0 +1,8 @@
+# `flutter test` with no arguments runs the `test/` directory only, so the brand
+# image generator in `tool/` is already outside the default suite. This file
+# names the tag it carries so the intent is explicit rather than incidental.
+tags:
+  tooling:
+    # Not skipped — running it is a deliberate act (`flutter test tool/...`).
+    # The tag exists so CI can exclude it with `--exclude-tags tooling` if the
+    # suite is ever widened to the whole repository.

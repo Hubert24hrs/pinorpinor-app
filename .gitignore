@@ -1,0 +1,84 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ─────────────────────────────────────────────────────────────────────────
+# Secrets and signing material — NEVER COMMIT
+#
+# The Flutter client holds no API keys by design (see docs/SECURITY.md), so
+# what follows is signing material and local configuration. Losing control of
+# the upload keystore means losing the ability to update the Play listing, and
+# there is no recovery for a leaked one beyond a key reset request.
+# ─────────────────────────────────────────────────────────────────────────
+
+# Android signing
+*.jks
+*.keystore
+android/key.properties
+android/app/upload-keystore.jks
+
+# iOS signing
+*.mobileprovision
+*.p12
+*.cer
+*.certSigningRequest
+ios/Runner/GoogleService-Info.plist
+ios/fastlane/report.xml
+ios/ExportOptions.plist
+
+# Firebase / Google service configuration, if push is ever wired up
+android/app/google-services.json
+**/firebase_options.dart
+
+# Environment overrides
+.env
+.env.*
+!.env.example
+
+# Local tooling
+*.pem
+*.key
+secrets/
+

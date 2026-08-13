@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+		<true/>
+		<key>CFBundleDevelopmentRegion</key>
+		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>CFBundleDisplayName</key>
+		<string>Pinorpinor</string>
+		<key>CFBundleExecutable</key>
+		<string>$(EXECUTABLE_NAME)</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>Pinorpinor</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>$(FLUTTER_BUILD_NAME)</string>
+		<key>CFBundleSignature</key>
+		<string>????</string>
+		<key>CFBundleVersion</key>
+		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<key>LSRequiresIPhoneOS</key>
+		<true/>
+
+		<!--
+			Permission strings. iOS shows these verbatim in the system prompt, and
+			App Review rejects a build whose wording does not explain the actual
+			use. Each one names the specific action that triggers it — the app
+			never asks at launch, only when the member taps the control.
+
+			There is deliberately no location entry: the backend stores a city
+			and never sends coordinates to a client, so the app has no use for
+			GPS and must not ask for it.
+		-->
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Pinorpinor needs access to your photos so you can choose pictures and videos for your profile. Nothing is uploaded until you select it.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>Pinorpinor uses the camera so you can take a photo or record a short video for your profile.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>Pinorpinor uses the microphone to record sound when you film a video for your profile.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>Pinorpinor saves a photo to your library only when you ask it to.</string>
+
+		<!--
+			Apps that link to their own website need this so the WhatsApp handoff
+			and the legal pages can be opened. iOS 9+ requires every custom scheme
+			the app queries to be declared; an undeclared scheme silently reports
+			as unavailable.
+		-->
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>whatsapp</string>
+			<string>https</string>
+			<string>http</string>
+		</array>
+
+		<!--
+			ATS left at its strict default: every connection the app makes is
+			HTTPS (the Pinorpinor API, the Supabase signed-upload endpoint and the
+			signed media URLs), so no exception is needed. Adding one would be
+			flagged at review and would weaken the session cookie's protection.
+		-->
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<key>NSAllowsArbitraryLoads</key>
+			<false/>
+		</dict>
+
+		<!--
+			Custom scheme for pinorpinor://profile/<username>. Verified HTTPS
+			Universal Links are configured separately through the Associated
+			Domains capability in Xcode — see docs/DEPLOYMENT.md, which also
+			covers the apple-app-site-association file the website must serve.
+		-->
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLName</key>
+				<string>com.pinorpinor.app</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>pinorpinor</string>
+				</array>
+			</dict>
+		</array>
+
+		<key>UIApplicationSceneManifest</key>
+		<dict>
+			<key>UIApplicationSupportsMultipleScenes</key>
+			<false/>
+			<key>UISceneConfigurations</key>
+			<dict>
+				<key>UIWindowSceneSessionRoleApplication</key>
+				<array>
+					<dict>
+						<key>UISceneClassName</key>
+						<string>UIWindowScene</string>
+						<key>UISceneConfigurationName</key>
+						<string>flutter</string>
+						<key>UISceneDelegateClassName</key>
+						<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+						<key>UISceneStoryboardFile</key>
+						<string>Main</string>
+					</dict>
+				</array>
+			</dict>
+		</dict>
+		<key>UIApplicationSupportsIndirectInputEvents</key>
+		<true/>
+		<key>UILaunchStoryboardName</key>
+		<string>LaunchScreen</string>
+		<key>UIMainStoryboardFile</key>
+		<string>Main</string>
+
+		<!--
+			iPhone stays portrait-only: every screen is a vertical list and a
+			rotated phone gains nothing. iPad allows all four, because the shell
+			switches to a navigation rail on a wide layout and Apple expects
+			iPad apps to support rotation.
+		-->
+		<key>UISupportedInterfaceOrientations</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+		</array>
+		<key>UISupportedInterfaceOrientations~ipad</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+
+		<key>UIStatusBarHidden</key>
+		<false/>
+		<!-- The app's own surfaces are light, so dark status-bar content. -->
+		<key>UIViewControllerBasedStatusBarAppearance</key>
+		<true/>
+
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
+	</dict>
+</plist>

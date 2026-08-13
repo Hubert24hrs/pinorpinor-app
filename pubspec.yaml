@@ -1,0 +1,86 @@
+name: pinorpinor_app
+description: "Pinorpinor — the official mobile app for the Pinorpinor premium social discovery platform."
+publish_to: 'none'
+
+# versionName+versionCode. Bump the build number for every Play/TestFlight upload.
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0-210.2.beta
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.6.1
+
+  # Navigation + deep links
+  go_router: ^17.5.0
+  app_links: ^7.0.0
+
+  # Networking
+  dio: ^5.11.0
+  connectivity_plus: ^7.3.1
+
+  # Secure session storage (Keystore / Keychain)
+  flutter_secure_storage: ^11.0.0
+  shared_preferences: ^2.5.5
+
+  # Media
+  cached_network_image: ^3.4.1
+  image_picker: ^1.2.3
+  flutter_image_compress: ^2.5.1
+  video_player: ^2.11.1
+
+  # Platform integration
+  url_launcher: ^6.3.2
+  flutter_local_notifications: ^22.3.0
+  package_info_plus: ^10.2.1
+
+  # Utilities
+  intl: ^0.20.3
+  collection: ^1.19.1
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/brand/
+
+  # Both families are variable fonts (single file, `wght` axis). The same asset is
+  # declared at each weight the design system uses so `fontWeight` resolves through
+  # the variable axis instead of synthetic bolding. Licences: assets/fonts/OFL-*.txt.
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSans.ttf
+          weight: 800
+    - family: PlayfairDisplay
+      fonts:
+        - asset: assets/fonts/PlayfairDisplay.ttf
+          weight: 500
+        - asset: assets/fonts/PlayfairDisplay.ttf
+          weight: 600
+        - asset: assets/fonts/PlayfairDisplay.ttf
+          weight: 700

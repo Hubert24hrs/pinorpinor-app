@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every connection the app makes is HTTPS: the Pinorpinor API, the Supabase
+  signed-upload endpoint, and the signed media URLs. Cleartext is therefore
+  refused outright rather than merely unused — a misconfigured origin or a
+  downgraded redirect fails loudly instead of quietly sending a session cookie
+  in the clear.
+
+  User-added CAs are excluded from the trust anchors, so a certificate installed
+  on the device cannot be used to intercept traffic. This is not a defence
+  against a rooted device, and is not claimed to be; it raises the cost of the
+  casual proxy-and-inspect case.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!--
+      Debug builds additionally trust user CAs, so a developer can run a proxy
+      against a local backend. This block is compiled into debug variants only
+      and has no effect on a release build.
+    -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

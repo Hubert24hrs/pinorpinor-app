@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		Universal Links. iOS only honours these once
+		https://pinorpinor.com/.well-known/apple-app-site-association is served
+		(as application/json, no redirect) naming this app's Team ID and bundle
+		identifier. Until that file is published, https links open in Safari and
+		only the pinorpinor:// scheme reaches the app.
+
+		This file has to be attached to the target in Xcode — a checked-in
+		entitlements file alone does nothing. See docs/DEPLOYMENT.md § iOS.
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:pinorpinor.com</string>
+		<string>applinks:www.pinorpinor.com</string>
+	</array>
+
+	<!--
+		Remote notifications. The app currently raises notifications locally
+		while it is in the foreground; server-pushed APNs delivery needs a
+		backend change (a device-token table and a send path), documented in
+		docs/DEPLOYMENT.md § "Push notifications". The entitlement is declared
+		here so enabling it later is a capability toggle rather than a
+		re-provisioning exercise.
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

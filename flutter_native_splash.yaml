@@ -1,0 +1,31 @@
+# Splash screen shown while the Flutter engine starts.
+#
+#   dart run flutter_native_splash:create
+#
+# The background is the website's warm ivory (--bg-primary), so the launch
+# transitions into the app's own background rather than flashing white or black.
+flutter_native_splash:
+  color: "#FAF8F5"
+  image: assets/brand/splash_mark.png
+
+  # Android 12+ draws its own splash from a themed icon on a solid background.
+  # Configured separately or the system ignores the legacy drawable entirely and
+  # shows a bare launcher icon on white.
+  android_12:
+    color: "#FAF8F5"
+    image: assets/brand/splash_mark.png
+    icon_background_color: "#FAF8F5"
+
+  # The brand has one light identity and no theme switcher on the website, so
+  # the dark variant deliberately matches rather than inventing a dark look the
+  # rest of the app does not have.
+  color_dark: "#FAF8F5"
+  image_dark: assets/brand/splash_mark.png
+
+  android: true
+  ios: true
+  web: false
+
+  # Draws behind the status and navigation bars, matching the app's own
+  # edge-to-edge layout so there is no visible jump at handover.
+  fullscreen: false
