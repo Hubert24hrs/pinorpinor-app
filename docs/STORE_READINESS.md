@@ -64,8 +64,29 @@ the member taps the control that needs it.
 | Photo library | Both | On "Choose from gallery" | Present |
 | Microphone | iOS | On video recording | Present |
 | Notifications | Both | When alerts are first enabled | Present |
+| Vibrate, wake lock | Android | — | Added by `flutter_local_notifications`, not by app code. Neither prompts the member; both are install-time permissions needed to raise a notification |
 | **Location** | — | **Never requested** | The backend stores a city; coordinates never reach a client |
 | **Contacts, calendar, mic-always, background location** | — | **Never requested** | Not declared anywhere |
+
+Verified against the **merged** manifest from a real Gradle build, not just the
+source manifest — the merged output is what a reviewer's tooling inspects, and
+it is where a dependency can quietly add a permission:
+
+```
+android.permission.INTERNET
+android.permission.ACCESS_NETWORK_STATE
+android.permission.POST_NOTIFICATIONS
+android.permission.CAMERA
+android.permission.VIBRATE          ← flutter_local_notifications
+android.permission.WAKE_LOCK        ← flutter_local_notifications
+<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION   ← AndroidX, self-scoped
+```
+
+No location, no contacts, no calendar, no external-storage permission. The same
+build confirms `android:label="Pinorpinor"`,
+`android:usesCleartextTraffic="false"`, the network security config, and all
+three deep-link entries (`pinorpinor://`, `pinorpinor.com`,
+`www.pinorpinor.com`).
 
 ## Content rating
 
@@ -204,6 +225,31 @@ flutter test                       # expect: All tests passed
 flutter build apk --debug          # expect: app-debug.apk
 flutter build appbundle --release  # expect: app-release.aab, signed with the upload key
 ```
+
+### On-device verification — NOT DONE, and why
+
+The app has **not been run on a physical device or an emulator.** The only AVD
+on the development machine (`Medium_Phone_API_36.1`, x86_64) refuses to start:
+
+```
+ERROR | x86_64 emulation currently requires hardware acceleration!
+CPU acceleration status: Android Emulator hypervisor driver is not installed
+```
+
+Installing the hypervisor driver is an administrator-level system change with a
+reboot, which is the machine owner's call rather than something to do to a
+development machine unasked.
+
+**This is the largest untested surface, and it is worth being blunt about it.**
+Compilation and the widget suite prove a great deal — layout at six widths,
+validation, error mapping, session handling, the safety flows — but they do not
+prove that the camera opens, that a real upload completes over a mobile
+connection, that WhatsApp launches from the handoff, that the deep link
+intent-filter resolves, or that the splash hands over cleanly.
+
+Before the first store submission, someone should install the debug APK on a
+real Android phone and walk the whole journey. `DEPLOYMENT.md` §
+"Verifying against a staging origin" describes exactly what to walk through.
 
 ## Remaining owner actions
 

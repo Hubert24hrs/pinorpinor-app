@@ -25,8 +25,17 @@ dependencies:
   dio: ^5.11.0
   connectivity_plus: ^7.3.1
 
-  # Secure session storage (Keystore / Keychain)
-  flutter_secure_storage: ^11.0.0
+  # Secure session storage (Keystore / Keychain).
+  #
+  # Pinned to the 10.x line on purpose. Version 11 compiles against Android SDK
+  # 37, which ships only as the minor-versioned `android-37.0` platform — and
+  # AGP 8.11 cannot address that (it looks for `android-37` and fails).
+  # Addressing it needs `compileSdkMinor`, which arrived in AGP 8.13.
+  #
+  # 10.x uses the same Keystore-backed EncryptedSharedPreferences on Android
+  # and the same Keychain API on iOS, so nothing about how the session is
+  # protected changes. Revisit when Flutter's default AGP reaches 8.13+.
+  flutter_secure_storage: ^10.0.0
   shared_preferences: ^2.5.5
 
   # Media
@@ -57,8 +66,15 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  assets:
-    - assets/brand/
+  # The brand PNGs are the *sources* for the launcher icon and splash, consumed
+  # at generation time by flutter_launcher_icons and flutter_native_splash — not
+  # loaded at runtime. They are not declared as assets, so none of them is
+  # bundled into the APK.
+  #
+  # Regenerate with:
+  #   flutter test tool/generate_brand_images_test.dart
+  #   dart run flutter_launcher_icons
+  #   dart run flutter_native_splash:create
 
   # Both families are variable fonts (single file, `wght` axis). The same asset is
   # declared at each weight the design system uses so `fontWeight` resolves through

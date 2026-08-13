@@ -57,9 +57,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return location == AppRoutes.splash ? null : AppRoutes.splash;
       }
 
-      if (location == AppRoutes.splash) {
-        return auth.isSignedIn ? AppRoutes.home : AppRoutes.home;
-      }
+      // Home is the landing screen either way: browsing is open to everyone,
+      // and a signed-in member sees the same screen with more of it enabled.
+      if (location == AppRoutes.splash) return AppRoutes.home;
 
       if (!auth.isSignedIn && AppRoutes.isProtected(location)) {
         final target = Uri.encodeComponent(state.uri.toString());

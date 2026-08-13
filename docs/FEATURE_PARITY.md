@@ -228,6 +228,25 @@ every upload is held for moderation and no member media has been approved yet.
 That is the platform's current state, not an app defect: the same request from a
 browser returns the same empty list.
 
+## What was not verified, and why
+
+**No device or emulator run.** The development machine's only AVD refuses to
+start — `x86_64 emulation currently requires hardware acceleration`, because the
+Android Emulator hypervisor driver is not installed, and installing it is an
+administrator-level change with a reboot. Every **NOT VERIFIED** row above is
+therefore verified to the level of "compiles, analyses clean, and its logic is
+unit-tested", and no further.
+
+The surfaces this leaves genuinely untested: camera capture, a real upload over
+a mobile connection, video playback, the WhatsApp app handoff, deep-link intent
+resolution, notification permission prompts, and the splash-to-first-frame
+handover.
+
+**No live member account.** Signed-in flows are written against the API
+contracts as read from the website source. Creating real accounts, reports or
+contact requests against a production platform with real members would have been
+the wrong thing to do.
+
 ---
 
 ## Summary

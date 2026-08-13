@@ -77,7 +77,7 @@ class ApiClient {
   /// describe browser behaviour that does not apply here — the app sends its
   /// cookies to exactly one origin and clears them on sign-out.
   Future<void> _absorbCookies(Headers headers) async {
-    final raw = headers[HttpHeaders.setCookie];
+    final raw = headers[_HeaderNames.setCookie];
     if (raw == null || raw.isEmpty) return;
 
     final harvested = <String, String>{};
@@ -193,7 +193,11 @@ class ApiClient {
 }
 
 /// Dio exposes header names as plain strings; naming them once avoids typos.
-class HttpHeaders {
-  const HttpHeaders._();
+///
+/// Deliberately not called `HttpHeaders`: `dart:io` exports a class by that
+/// name, and any file importing both this library and `dart:io` — the media
+/// repository does — would get an ambiguous reference the moment it used it.
+class _HeaderNames {
+  const _HeaderNames._();
   static const setCookie = 'set-cookie';
 }

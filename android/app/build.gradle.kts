@@ -22,12 +22,23 @@ if (hasReleaseKeystore) {
 
 android {
     namespace = "com.pinorpinor.app"
+
+    // Flutter's default, currently 36. Every dependency compiles against 36 or
+    // lower — see the note on `flutter_secure_storage` in pubspec.yaml for why
+    // that pin matters: SDK 37 ships only as the minor-versioned `android-37.0`
+    // platform, which AGP 8.11 cannot resolve.
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+
+        // Required by flutter_local_notifications, which uses java.time to
+        // schedule notifications. Without it the build fails at
+        // :app:checkDebugAarMetadata. Desugaring backports those APIs to the
+        // minSdk below rather than raising it, so no device is excluded.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -89,6 +100,11 @@ android {
         density { enableSplit = true }
         abi { enableSplit = true }
     }
+}
+
+dependencies {
+    // The desugaring runtime that `isCoreLibraryDesugaringEnabled` above needs.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 flutter {

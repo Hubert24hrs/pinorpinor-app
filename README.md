@@ -262,6 +262,15 @@ The integration test drives the real app widget with a scripted backend. It
 deliberately does not hit production — a suite that created real accounts and
 real reports on a live platform with real members would be worse than none.
 
+**The app has not been run on a device or emulator.** The development machine's
+only AVD cannot start (`x86_64 emulation currently requires hardware
+acceleration` — the Android Emulator hypervisor driver is not installed, and
+installing it is an admin-level change with a reboot). Everything above is
+compile-time and widget-level verification. Camera capture, a real upload over a
+mobile connection, the WhatsApp handoff, and deep-link intent resolution have
+**not** been exercised end to end — see `docs/STORE_READINESS.md` §
+"On-device verification".
+
 To regenerate the brand artwork:
 
 ```bash
@@ -343,6 +352,8 @@ Summary — the detail is in [docs/SECURITY.md](docs/SECURITY.md):
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `flutter pub get` fails on the SDK constraint | Stable channel Flutter | `flutter channel beta && flutter upgrade` |
+| Gradle: `Failed to find target with hash string 'android-37'` | A dependency was upgraded to one compiling against SDK 37, which ships only as the minor-versioned `android-37.0` platform that AGP 8.11 cannot address | Keep `flutter_secure_storage` on the 10.x line, or move to AGP 8.13+ and set `compileSdkMinor` |
+| Gradle: `plugin X requires Android SDK version N or higher` | Same root cause, reported before the build starts | As above |
 | Sign-in always fails with "Incorrect email or password" | The origin has no such account, or the account is suspended | Check the origin with `--dart-define`; suspension is intentional |
 | Images load then go blank after an hour | Signed URLs expired | Pull to refresh; the API re-signs on every read |
 | Images 404 immediately after a delete | Correct — signed URLs revoke at once | Not a bug |
