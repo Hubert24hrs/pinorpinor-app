@@ -89,6 +89,14 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       appBar: AppBar(
         title: const Text('Discover'),
         actions: <Widget>[
+          // The deck needs a session; offering it signed-out would land on a
+          // prompt. The grid is the surface that works for everyone.
+          if (signedIn)
+            IconButton(
+              icon: const Icon(Icons.style_rounded),
+              tooltip: 'Swipe one at a time',
+              onPressed: () => context.push(AppRoutes.swipe),
+            ),
           IconButton(
             onPressed: _openFilters,
             tooltip: 'Filters',
@@ -185,6 +193,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                       ),
                     ),
 
+                  if (filters.active.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: ContentContainer(
+                        child: _ActiveFilterChips(filters: filters),
+                      ),
+                    ),
+
                   SliverPadding(
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     sliver: SliverToBoxAdapter(
@@ -239,6 +254,72 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// One chip per active filter, each with its own clear.
+///
+/// The count badge on the filter button says *how many* narrowings are on; it
+/// cannot say *which*. Without this a member who has forgotten they set an age
+/// range sees an empty grid with no visible cause, and the only way to find out
+/// is to reopen the sheet.
+class _ActiveFilterChips extends ConsumerWidget {
+  const _ActiveFilterChips({required this.filters});
+
+  final DiscoveryFilters filters;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = filters.active;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        0,
+      ),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: <Widget>[
+          for (final filter in active)
+            InputChip(
+              label: Text(filter.label),
+              onDeleted: () => ref
+                  .read(discoveryFiltersProvider.notifier)
+                  .state = filter.clear(),
+              deleteIcon: const Icon(Icons.close_rounded, size: 15),
+              deleteButtonTooltipMessage: 'Remove ${filter.label}',
+              visualDensity: VisualDensity.compact,
+              backgroundColor: AppColors.badgeRoseBg,
+              side: const BorderSide(color: AppColors.badgeRoseBorder),
+              labelStyle: const TextStyle(
+                fontFamily: AppTheme.sansFamily,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.badgeRoseFg,
+              ),
+            ),
+
+          // Only worth offering once removing them one at a time is tedious.
+          if (active.length > 1)
+            TextButton(
+              onPressed: () => ref
+                  .read(discoveryFiltersProvider.notifier)
+                  .state = DiscoveryFilters.none,
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                ),
+              ),
+              child: const Text('Clear all'),
+            ),
+        ],
       ),
     );
   }

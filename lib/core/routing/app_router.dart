@@ -9,6 +9,7 @@ import '../../features/auth/password_screens.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/credits/credits_screen.dart';
 import '../../features/discovery/discover_screen.dart';
+import '../../features/discovery/swipe_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/media/manage_media_screen.dart';
@@ -165,6 +166,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ConversationScreen(
           conversationId: state.pathParameters['id'] ?? '',
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.swipe,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SwipeScreen(),
       ),
       GoRoute(
         path: AppRoutes.matches,

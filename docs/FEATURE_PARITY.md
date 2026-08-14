@@ -114,7 +114,7 @@ API route handlers, 27 Prisma models — not from a summary.
 | Ladies rail (`/api/ladies`) | Home screen horizontal rail | COMPLETE | VERIFIED (parsing) | Handles the `ladyProfile` rename |
 | Spotlight / Face of the Day | Home card | COMPLETE | VERIFIED (parsing) | |
 | Locations (`/api/public/locations`) | City chips | COMPLETE | NOT VERIFIED | |
-| Swipe deck (`/api/discover`) | `DiscoveryRepository.deck` implemented | PARTIAL | NOT VERIFIED | The repository and swipe call are complete; no swipe *screen* is shipped. The website surfaces no swipe UI either — `/api/swipe` exists but nothing on the site calls it — so shipping one would be adding a product feature, not reproducing one |
+| Swipe deck (`/api/discover`, `/api/swipe`) | `SwipeScreen` + `SwipeDeckController` | COMPLETE | VERIFIED (logic) | **The app exceeds the website here.** Both endpoints were fully implemented server-side — deck building, two-way block filtering, country scoping, already-swiped exclusion, mutual-like match creation with its conversation — and nothing on the website called them. Added 2026-08-14 with optimistic swipes and rollback; 17 unit tests |
 | `/browse` and `/live` fabricated profiles | Not reproduced | NOT APPLICABLE | — | Those two website pages serve six invented women and three invented "live streamers" built from stock photographs of real people. The website's own notes flag them as an open product decision. Reproducing invented people in a shipped app would be worse than omitting them |
 
 ## Messaging
@@ -255,10 +255,17 @@ the wrong thing to do.
 
 | Status | Count |
 | --- | --- |
-| COMPLETE | 96 |
-| PARTIAL | 9 |
+| COMPLETE | 97 |
+| PARTIAL | 8 |
 | NOT APPLICABLE | 11 |
 | BLOCKED | 1 |
+
+Two rows are worth calling out because they run the other way — the app does
+something the website does not:
+
+- **Swipe deck.** `/api/swipe` had no caller anywhere until the app shipped one.
+- **18+ acknowledgement.** The website has no age gate; the app has one, because
+  the stores expect it of an adult-oriented app.
 
 **No website feature is unintentionally missing.** Every PARTIAL and NOT
 APPLICABLE row above states its reason, and each falls into one of four

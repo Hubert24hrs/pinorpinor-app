@@ -30,6 +30,10 @@ class AppRoutes {
   static const conversation = '/conversation';
   static String conversationFor(String id) => '$conversation/$id';
 
+  /// The swipe deck. Protected: `/api/discover` and `/api/swipe` both require a
+  /// session, and a deck with nothing to swipe on would be a dead screen.
+  static const swipe = '/swipe';
+
   static const editProfile = '/me/edit';
   static const manageMedia = '/me/media';
   static const verification = '/verify';
@@ -47,6 +51,7 @@ class AppRoutes {
   /// re-checked by the backend on every request these screens make — the client
   /// guard is convenience, not security.
   static const Set<String> protectedPrefixes = <String>{
+    swipe,
     messages,
     notifications,
     account,

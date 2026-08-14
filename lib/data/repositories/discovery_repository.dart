@@ -36,12 +36,34 @@ class DiscoveryFilters {
       !availableTodayOnly;
 
   /// How many filters are active, for the badge on the filter button.
-  int get activeCount => <bool>[
-    city != null && city!.isNotEmpty && city != 'ALL',
-    ageMin > 18 || ageMax < 99,
-    verifiedOnly,
-    availableTodayOnly,
-  ].where((active) => active).length;
+  int get activeCount => active.length;
+
+  /// The active filters, each with a label and the filters that result from
+  /// dropping it.
+  ///
+  /// Lets the UI show one chip per active filter with its own clear button, so
+  /// a member can see and undo a single narrowing without reopening the sheet.
+  /// Age is one entry rather than two — "18–30" is the unit a person thinks in,
+  /// and clearing half of it is not a thing anyone wants.
+  List<ActiveFilter> get active => <ActiveFilter>[
+    if (city != null && city!.isNotEmpty && city != 'ALL')
+      ActiveFilter(label: city!, clear: () => copyWith(clearCity: true)),
+    if (ageMin > 18 || ageMax < 99)
+      ActiveFilter(
+        label: '$ageMin–$ageMax years',
+        clear: () => copyWith(ageMin: 18, ageMax: 99),
+      ),
+    if (verifiedOnly)
+      ActiveFilter(
+        label: 'Verified',
+        clear: () => copyWith(verifiedOnly: false),
+      ),
+    if (availableTodayOnly)
+      ActiveFilter(
+        label: 'Available today',
+        clear: () => copyWith(availableTodayOnly: false),
+      ),
+  ];
 
   DiscoveryFilters copyWith({
     String? city,
@@ -74,6 +96,20 @@ class DiscoveryFilters {
     if (verifiedOnly) 'verified': 'true',
     if (availableTodayOnly) 'available': 'true',
   };
+}
+
+/// One active filter, with the label to show and the way to drop it.
+///
+/// Carrying the removal as a closure keeps the "what does clearing this mean"
+/// decision beside the "what is this called" decision, instead of splitting
+/// them across a widget and a switch on a string key.
+class ActiveFilter {
+  const ActiveFilter({required this.label, required this.clear});
+
+  final String label;
+
+  /// The filters that result from removing this one.
+  final DiscoveryFilters Function() clear;
 }
 
 class DiscoveryRepository {

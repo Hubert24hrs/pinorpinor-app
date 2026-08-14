@@ -151,9 +151,9 @@ reading the reason.
   cert rotation; the realistic failure is a bricked app in members' hands.
 - **No dark mode.** The website ships one light identity with no switcher. The
   theming is structured to accept one later.
-- **No swipe deck** *(as of this writing)* — `/api/swipe` and `/api/discover`
-  are fully wired in `DiscoveryRepository`, but no screen calls them. The
-  website surfaces no swipe UI either. See "Next steps".
+*(The swipe deck was the fourth entry here until 2026-08-14. It now exists —
+`features/discovery/swipe_screen.dart` — and is the app's only surface for
+`/api/swipe`, which the website still does not expose.)*
 
 ---
 
@@ -262,12 +262,13 @@ gesture handling and filter-chip patterns are worth borrowing.
 
 In priority order:
 
-1. **Build the swipe deck.** `/api/discover` and `/api/swipe` are already wired
-   in `DiscoveryRepository` (including the match-created response) and nothing
-   calls them. Highest value per unit of work in the codebase.
-2. **Get it onto a real device.** Every "not verified" row above collapses the
+1. **Get it onto a real device.** Every "not verified" row above collapses the
    moment someone installs the debug APK on an Android phone and walks the
-   journey in `docs/DEPLOYMENT.md`.
-3. **Create the upload keystore** and produce a signed `.aab`.
+   journey in `docs/DEPLOYMENT.md`. The swipe deck in particular has never been
+   touched by a finger — its gesture thresholds are reasoned, not felt.
+2. **Create the upload keystore** and produce a signed `.aab`.
+3. **Active-filter chips on Discover** — the second pattern worth taking from
+   the aura review, and the smaller half. The filter sheet exists; what is
+   missing is seeing and dropping one filter without reopening it.
 4. Owner: approve some real member media so discovery is not empty, and set the
    SMS provider key so phone verification can complete.
