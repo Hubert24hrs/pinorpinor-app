@@ -250,9 +250,9 @@ Current state: **127 tests, all passing; analyzer clean; debug APK builds.**
 | Gate | Result |
 | --- | --- |
 | `flutter analyze` | No issues found |
-| `flutter test` | 127 passing |
+| `flutter test` | 158 passing |
 | `dart format .` | Clean |
-| `flutter build apk --debug` | `app-debug.apk` produced (95.9 MB, arm64) |
+| `flutter build apk --debug` | `app-debug.apk` produced (116.1 MB, arm64) |
 | `flutter build appbundle --release` | Not run — needs the owner's `key.properties` |
 
 | Suite | Covers |

@@ -5,9 +5,25 @@
 > codebase. Trust the source over this file where they disagree, and update this
 > file when they do.
 
-Last verified: **2026-08-14**. Analyzer clean, 127 tests passing, debug APK
+Last verified: **2026-08-14**. Analyzer clean, **158 tests passing**, debug APK
 builds. Local: `C:\Users\HP\.gemini\antigravity-ide\scratch\pinorpinor-app`.
 Repository: `https://github.com/Hubert24hrs/pinorpinor-app`, branch `main`.
+
+## Where the last session stopped
+
+Everything is committed and pushed; the working tree is clean. A debug APK was
+handed to the owner to install on a real phone — **the app's first contact with
+hardware**. Nothing in it has been touched by a finger yet.
+
+The build was `--target-platform android-arm64` only, because a universal build
+kept timing out on this machine. That covers essentially every phone from 2016
+onward, but `INSTALL_FAILED_NO_MATCHING_ABIS` means the fix is a universal
+build, not a code change.
+
+**Pick up here:** the device-test checklist under "Next steps". Everything in
+the "Verification status" table below collapses from *unverified* to *known* the
+moment that walk-through happens, and nothing else in the project unblocks as
+much for as little work.
 
 ---
 
@@ -206,8 +222,8 @@ reports on a live platform with real members would be worse than none.
 | Area | Status |
 | --- | --- |
 | `flutter analyze` | Clean |
-| `flutter test` | 127 passing |
-| Debug APK | Builds (95.9 MB, arm64) |
+| `flutter test` | 158 passing |
+| Debug APK | Builds (116.1 MB, arm64, 49.7s incremental) |
 | Release `.aab` | **Not run** — needs the owner's `android/key.properties` |
 | iOS build | **Blocked** — needs macOS + Xcode |
 | On device / emulator | **Never run.** The machine's only AVD cannot start: `x86_64 emulation currently requires hardware acceleration` — the hypervisor driver is not installed |
@@ -262,11 +278,37 @@ gesture handling and filter-chip patterns are worth borrowing.
 
 In priority order:
 
-1. **Get it onto a real device.** Every "not verified" row above collapses the
-   moment someone installs the debug APK on an Android phone and walks the
-   journey in `docs/DEPLOYMENT.md`. The swipe deck in particular has never been
-   touched by a finger — its gesture thresholds are reasoned, not felt.
-2. **Create the upload keystore** and produce a signed `.aab`.
+1. **Get it onto a real device.** In progress — an APK is with the owner. Build
+   a fresh one with:
+
+   ```
+   flutter build apk --debug --target-platform android-arm64
+   → build/app/outputs/flutter-apk/app-debug.apk
+   ```
+
+   Drop `--target-platform` for a universal build if arm64 will not install
+   (expect it to take considerably longer here).
+
+   What to check, hardest-to-fake first:
+
+   | # | Check | Why it cannot be verified any other way |
+   | --- | --- | --- |
+   | 1 | Swipe deck feel (Discover → cards icon) | 110px commit threshold and 0.18rad rotation cap are reasoned, never felt |
+   | 2 | 18+ gate on first launch, absent on the second | Exercises `SharedPreferences` round-tripping on a real device |
+   | 3 | Camera + photo upload (Profile → Photos and videos) | Crosses picker, compressor, presign, direct PUT and confirm — completely untested |
+   | 4 | WhatsApp handoff after an accepted contact request | Depends on `LSApplicationQueriesSchemes` / package visibility resolving |
+   | 5 | `adb shell am start -a android.intent.action.VIEW -d "pinorpinor://profile/test"` | Intent filter resolution is a manifest behaviour |
+   | 6 | Splash → first frame handover | Android 12+ draws its own splash; a mismatch shows as a flash |
+
+   Expect **discovery to be empty** — production has no approved member media,
+   and a browser gets the same empty list. That is the platform's state, not a
+   defect.
+
+2. **Create the upload keystore** and produce a signed `.aab`. Nothing exists
+   for this yet, deliberately: generating it means choosing passwords, and
+   those belong to the owner. `android/key.properties` is absent, so a release
+   build silently falls back to debug signing and Play will reject it — the
+   intended failure mode.
 3. **Active-filter chips on Discover** — the second pattern worth taking from
    the aura review, and the smaller half. The filter sheet exists; what is
    missing is seeing and dropping one filter without reopening it.
