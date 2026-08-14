@@ -5,6 +5,9 @@ import 'core/routing/app_router.dart';
 import 'core/routing/deep_link_handler.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_controller.dart';
+import 'features/auth/splash_screen.dart';
+import 'features/onboarding/age_gate_controller.dart';
+import 'features/onboarding/age_gate_screen.dart';
 
 /// The application root.
 class PinorpinorApp extends ConsumerStatefulWidget {
@@ -20,8 +23,12 @@ class _PinorpinorAppState extends ConsumerState<PinorpinorApp> {
     super.initState();
     // Restore the stored session before the first frame settles, so the splash
     // resolves into the right screen rather than flashing signed-out.
+    //
+    // The age acknowledgement is read in parallel: both are local reads, and
+    // sequencing them would add a round trip to every cold start for no reason.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(authControllerProvider.notifier).restore();
+      ref.read(ageGateControllerProvider.notifier).restore();
     });
   }
 
@@ -51,10 +58,48 @@ class _PinorpinorAppState extends ConsumerState<PinorpinorApp> {
                 maxScaleFactor: 1.4,
               ),
             ),
-            child: child ?? const SizedBox.shrink(),
+            // The gate wraps the router's output rather than being a route.
+            //
+            // As a route it would be reachable by deep link and skippable by
+            // one — `pinorpinor://profile/x` would land straight on a profile
+            // photo without the notice ever rendering. Wrapping the whole
+            // navigator means nothing paints until the acknowledgement is
+            // resolved, whatever brought the member into the app.
+            child: _AgeGateBoundary(child: child ?? const SizedBox.shrink()),
           );
         },
       ),
     );
+  }
+}
+
+/// Holds the app behind the 18+ acknowledgement.
+///
+/// Keeps [child] mounted underneath rather than swapping it out, so the router
+/// keeps its state and the member lands exactly where their deep link pointed
+/// once they accept — no second navigation, no lost destination.
+class _AgeGateBoundary extends ConsumerWidget {
+  const _AgeGateBoundary({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final phase = ref.watch(ageGateControllerProvider);
+
+    return switch (phase) {
+      // Local read, typically a frame or two. The splash already reads as
+      // "starting up", so reusing it avoids a second distinct loading state.
+      AgeGatePhase.checking => const SplashScreen(),
+
+      AgeGatePhase.required => AgeGateScreen(
+        onAccept: () => ref.read(ageGateControllerProvider.notifier).accept(),
+        onDecline: () => ref.read(ageGateControllerProvider.notifier).decline(),
+      ),
+
+      AgeGatePhase.declined => const AgeGateDeclinedScreen(),
+
+      AgeGatePhase.accepted => child,
+    };
   }
 }

@@ -63,10 +63,15 @@ class AppConfig {
     'video/quicktime',
   ];
 
-  /// Public legal pages, reused by Settings and by the store listings.
-  static String get privacyPolicyUrl => '$apiOrigin/privacy';
-  static String get termsUrl => '$apiOrigin/terms';
-  static String get safetyUrl => '$apiOrigin/safety';
-  static String get contactUrl => '$apiOrigin/contact';
-  static String get aboutUrl => '$apiOrigin/about';
+  /// Public legal pages, reused by Settings, the age gate and the store
+  /// listings.
+  ///
+  /// `const` rather than getters so they can be used in const constructors —
+  /// the age gate's legal links are const widgets, and a getter would force the
+  /// whole subtree to rebuild on every frame it appears in.
+  static const String privacyPolicyUrl = '$apiOrigin/privacy';
+  static const String termsUrl = '$apiOrigin/terms';
+  static const String safetyUrl = '$apiOrigin/safety';
+  static const String contactUrl = '$apiOrigin/contact';
+  static const String aboutUrl = '$apiOrigin/about';
 }
