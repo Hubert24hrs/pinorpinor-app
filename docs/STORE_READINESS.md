@@ -164,7 +164,7 @@ Also declare: encrypted in transit; deletion available in-app; **no tracking**;
 | Item | Status | Evidence |
 | --- | --- | --- |
 | `flutter analyze` | DONE | 0 issues, with lints tightened beyond `flutter_lints` |
-| `flutter test` | DONE | 158 tests passing |
+| `flutter test` | DONE | 167 tests passing |
 | `dart format` | DONE | Clean |
 | Android debug APK | DONE | `app-debug.apk`, 116.1 MB, arm64 |
 | Android release `.aab` | OWNER — needs `key.properties` | Config in place; falls back to debug signing without it |
@@ -231,7 +231,7 @@ Results from this repository:
 | Command | Result |
 | --- | --- |
 | `flutter analyze` | **No issues found** |
-| `flutter test` | **158 tests, all passing** |
+| `flutter test` | **167 tests, all passing** |
 | `dart format .` | Clean |
 | `flutter build apk --debug --target-platform android-arm64` | **Succeeded** — `build/app/outputs/flutter-apk/app-debug.apk`, 116.1 MB. 1367s cold, 50s incremental |
 | `flutter build appbundle --release` | **Not run** — needs `android/key.properties`, which only the owner can create |
@@ -246,10 +246,25 @@ A debug APK is large because it carries the full Dart kernel and the debug
 engine. A release bundle with R8, resource shrinking and ABI/density splits is a
 fraction of it.
 
-### On-device verification — NOT DONE, and why
+### On-device verification — partially done
 
-The app has **not been run on a physical device or an emulator.** The only AVD
-on the development machine (`Medium_Phone_API_36.1`, x86_64) refuses to start:
+**Install: confirmed.** The APK installs on a real phone.
+
+**Launch: one crash found and fixed, confirmation pending.** The first build on
+hardware died instantly — `MainActivity.kt` declared the pre-rename package, so
+the manifest's relative `.MainActivity` resolved to a class that did not exist.
+Every gate reported success beforehand; only the device disagreed. Fixed and
+guarded by `test/unit/android_manifest_test.dart`, but **the corrected build has
+not yet been confirmed to launch**.
+
+That one bug is the clearest possible argument for finishing this section: it
+was invisible to the analyzer, the test suite and Gradle, and it would have
+reached store review.
+
+Everything below still stands for the rest of the surface.
+
+The only AVD on the development machine (`Medium_Phone_API_36.1`, x86_64)
+refuses to start:
 
 ```
 ERROR | x86_64 emulation currently requires hardware acceleration!

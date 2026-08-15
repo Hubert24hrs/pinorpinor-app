@@ -5,25 +5,45 @@
 > codebase. Trust the source over this file where they disagree, and update this
 > file when they do.
 
-Last verified: **2026-08-14**. Analyzer clean, **158 tests passing**, debug APK
+Last verified: **2026-08-14**. Analyzer clean, **167 tests passing**, debug APK
 builds. Local: `C:\Users\HP\.gemini\antigravity-ide\scratch\pinorpinor-app`.
 Repository: `https://github.com/Hubert24hrs/pinorpinor-app`, branch `main`.
 
 ## Where the last session stopped
 
-Everything is committed and pushed; the working tree is clean. A debug APK was
-handed to the owner to install on a real phone — **the app's first contact with
-hardware**. Nothing in it has been touched by a finger yet.
+Everything is committed and pushed; the working tree is clean.
 
-The build was `--target-platform android-arm64` only, because a universal build
+**The app has now reached a real phone once, and it crashed on launch.**
+`MainActivity.kt` still declared the pre-rename package, so the manifest's
+relative `.MainActivity` resolved to a class that did not exist. Fixed, verified
+at the bytecode level — the correct class is in `classes15.dex` of the APK and
+no copy of the old one survives anywhere in `build/` — and guarded by
+`test/unit/android_manifest_test.dart`. See "The trap that actually shipped".
+
+A corrected APK is with the owner. **Whether it now launches is not yet known.**
+That is the single most valuable outstanding answer in the project: it is the
+difference between "one crash, found and fixed" and "the first screen has still
+never rendered on hardware".
+
+If it still fails, get a crash log rather than guessing:
+
+```
+adb uninstall com.pinorpinor.app.debug   # a stale install looks identical to a broken build
+adb install build/app/outputs/flutter-apk/app-debug.apk
+adb logcat -d *:E | Select-String -Pattern "pinorpinor|AndroidRuntime" -Context 0,15
+```
+
+The expected first screen is the **18+ notice**, not the home screen. A white or
+black screen instead is a different fault, and the logcat will name it.
+
+The build is `--target-platform android-arm64` only, because a universal build
 kept timing out on this machine. That covers essentially every phone from 2016
-onward, but `INSTALL_FAILED_NO_MATCHING_ABIS` means the fix is a universal
-build, not a code change.
+onward; `INSTALL_FAILED_NO_MATCHING_ABIS` means the fix is a universal build,
+not a code change.
 
-**Pick up here:** the device-test checklist under "Next steps". Everything in
-the "Verification status" table below collapses from *unverified* to *known* the
-moment that walk-through happens, and nothing else in the project unblocks as
-much for as little work.
+**Pick up here:** confirm launch, then the device-test checklist under "Next
+steps". Everything in the "Verification status" table collapses from
+*unverified* to *known* the moment that walk-through happens.
 
 ---
 
@@ -198,7 +218,7 @@ licences included), not fetched at runtime.
 
 ```bash
 flutter analyze     # expect: No issues found
-flutter test        # expect: 127 passing
+flutter test        # expect: 167 passing
 flutter build apk --debug
 ```
 
@@ -222,11 +242,13 @@ reports on a live platform with real members would be worse than none.
 | Area | Status |
 | --- | --- |
 | `flutter analyze` | Clean |
-| `flutter test` | 158 passing |
+| `flutter test` | 167 passing |
 | Debug APK | Builds (116.1 MB, arm64, 49.7s incremental) |
 | Release `.aab` | **Not run** — needs the owner's `android/key.properties` |
 | iOS build | **Blocked** — needs macOS + Xcode |
-| On device / emulator | **Never run.** The machine's only AVD cannot start: `x86_64 emulation currently requires hardware acceleration` — the hypervisor driver is not installed |
+| On device — install | **Confirmed.** The APK installs on the owner's phone |
+| On device — launch | **One crash found and fixed** (wrong `MainActivity` package). The corrected build has **not yet been confirmed to launch** |
+| Emulator | **Unavailable.** The machine's only AVD cannot start: `x86_64 emulation currently requires hardware acceleration` — the hypervisor driver is not installed |
 | Signed-in API flows | **Not verified against a live account.** Written against contracts read from the website source |
 
 Untested as a result: camera capture, a real upload over mobile data, video
