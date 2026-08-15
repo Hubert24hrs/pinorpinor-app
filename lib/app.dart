@@ -75,9 +75,15 @@ class _PinorpinorAppState extends ConsumerState<PinorpinorApp> {
 
 /// Holds the app behind the 18+ acknowledgement.
 ///
-/// Keeps [child] mounted underneath rather than swapping it out, so the router
-/// keeps its state and the member lands exactly where their deep link pointed
-/// once they accept — no second navigation, no lost destination.
+/// The gate replaces [child] rather than covering it, so the Navigator is not
+/// in the tree while the notice is up. That is deliberate: a covered Navigator
+/// would still be building the screen underneath, which on a cold start means
+/// firing the discovery request and decoding profile photos behind a notice the
+/// member has not accepted yet.
+///
+/// Nothing is lost by unmounting it. GoRouter holds the current location in its
+/// own configuration, not in the widget, so accepting remounts the Navigator at
+/// the destination the deep link asked for.
 class _AgeGateBoundary extends ConsumerWidget {
   const _AgeGateBoundary({required this.child});
 

@@ -238,6 +238,32 @@ against production; the 401-on-bad-credential shape was confirmed there.
 
 ---
 
+## The trap that actually shipped
+
+**`MainActivity.kt`'s package must equal `namespace` in `build.gradle.kts`.**
+
+The manifest registers the activity as `android:name=".MainActivity"` — a
+*relative* name that Android resolves against the namespace. The namespace and
+`applicationId` were renamed from `com.pinorpinor.pinorpinor_app` to
+`com.pinorpinor.app` and the Kotlin file was left where it was.
+
+Everything reported success: Kotlin compiled, the manifest merged, Gradle built,
+`flutter analyze` and 158 tests were green, and the APK installed on a real
+phone. It then died the instant the icon was tapped —
+`ClassNotFoundException: com.pinorpinor.app.MainActivity`.
+
+Nothing in the Flutter toolchain catches this, because from its point of view
+nothing is wrong. `test/unit/android_manifest_test.dart` now does: it reads the
+real Gradle and manifest files and asserts the Kotlin file exists at the path
+the namespace implies and declares that package. It also guards the permission
+set, the cleartext refusal, the deep-link filters and the WhatsApp `<queries>`
+entry — all things that fail only at runtime, on a device.
+
+If you rename the namespace again, move the Kotlin file and change its `package`
+line in the same commit.
+
+---
+
 ## Android build — three traps already hit
 
 1. **`flutter_secure_storage` is pinned to `^10.0.0`.** Version 11 compiles
