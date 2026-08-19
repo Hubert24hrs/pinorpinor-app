@@ -178,6 +178,28 @@ class Validators {
     return null;
   }
 
+  /// The sign-in field, which accepts a username *or* an email address.
+  ///
+  /// The backend splits the two on the presence of an "@" (see `authorize()`
+  /// in the website's `src/lib/auth.ts`), so this validates whichever form the
+  /// member typed rather than forcing one. Validating it as an email would
+  /// lock out every account created since 2026-08-14, none of which has an
+  /// address at all.
+  ///
+  /// Deliberately looser than [UsernameRules.validate]: this is a lookup key
+  /// for an account that already exists, and rejecting a legacy username that
+  /// predates the current rules would leave its owner unable to sign in with
+  /// a name the server still accepts.
+  static String? loginIdentifier(String? raw) {
+    final value = (raw ?? '').trim();
+    if (value.isEmpty) return 'Enter your username or email address.';
+    if (value.contains('@')) return email(value);
+    if (value.length < UsernameRules.minLength) {
+      return 'Enter your username or email address.';
+    }
+    return null;
+  }
+
   /// 8–100, matching `registerSchema` and `/api/member/join`. The website's
   /// join form once accepted a one-character password; the floor is enforced on
   /// both sides now.

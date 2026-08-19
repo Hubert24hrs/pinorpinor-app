@@ -69,7 +69,7 @@ void main() {
       final container = ProviderScope.containerOf(element, listen: false);
       await container
           .read(authControllerProvider.notifier)
-          .signIn(email: 'member@example.com', password: 'password123');
+          .signIn(identifier: 'member@example.com', password: 'password123');
       await tester.pump();
     }
   }

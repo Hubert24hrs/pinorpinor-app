@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pinorpinor_app/core/network/api_exception.dart';
 import 'package:pinorpinor_app/features/auth/login_screen.dart';
@@ -27,7 +27,10 @@ void main() {
     await pumpLogin(tester, FakeAuthRepository());
 
     expect(find.text('Welcome back'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'Email'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextFormField, 'Username or email'),
+      findsOneWidget,
+    );
     expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
     expect(find.text('Forgot password?'), findsOneWidget);
   });
@@ -35,12 +38,15 @@ void main() {
   testWidgets('rejects a malformed email before making a request', (
     tester,
   ) async {
+    // Anything containing an "@" is treated as an email and validated as one —
+    // that is how the backend decides which column to search. A value with no
+    // "@" is a username and is deliberately *not* held to this rule.
     final repository = FakeAuthRepository();
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Email'),
-      'not-an-email',
+      find.widgetWithText(TextFormField, 'Username or email'),
+      'not-an-email@',
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Password'),
@@ -58,7 +64,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Email'),
+      find.widgetWithText(TextFormField, 'Username or email'),
       'member@example.com',
     );
     await tester.tap(find.widgetWithText(GradientButton, 'Sign in'));
@@ -77,7 +83,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Email'),
+      find.widgetWithText(TextFormField, 'Username or email'),
       'member@example.com',
     );
     await tester.enterText(
@@ -90,14 +96,38 @@ void main() {
     expect(repository.signInCalls, hasLength(1));
   });
 
-  testWidgets('lowercases the email before sending it', (tester) async {
-    // The backend folds emails to lowercase on write; the client matching that
-    // is what stops "User@x.com" failing to sign in as "user@x.com".
+  testWidgets('accepts a bare username, which is now the common case', (
+    tester,
+  ) async {
+    // Registration stopped collecting an email on 2026-08-14, so most accounts
+    // have only a username. Validating this field as an email would lock every
+    // one of them out.
     final repository = FakeAuthRepository();
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Email'),
+      find.widgetWithText(TextFormField, 'Username or email'),
+      'zainab_lagos',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Password'),
+      'password123',
+    );
+    await tester.tap(find.widgetWithText(GradientButton, 'Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(repository.signInCalls.single.$1, 'zainab_lagos');
+  });
+
+  testWidgets('lowercases the identifier before sending it', (tester) async {
+    // Both columns are stored folded — emails on write, usernames by a database
+    // CHECK — so the client matching that is what stops "User@x.com" failing to
+    // sign in as "user@x.com".
+    final repository = FakeAuthRepository();
+    await pumpLogin(tester, repository);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Username or email'),
       '  Member@Example.COM  ',
     );
     await tester.enterText(
@@ -122,7 +152,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Email'),
+      find.widgetWithText(TextFormField, 'Username or email'),
       'member@example.com',
     );
     await tester.enterText(
@@ -147,7 +177,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Email'),
+      find.widgetWithText(TextFormField, 'Username or email'),
       'member@example.com',
     );
     await tester.enterText(

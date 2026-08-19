@@ -6,9 +6,14 @@ import 'package:pinorpinor_app/shared/widgets/brand.dart';
 import '../helpers/fake_auth_repository.dart';
 import '../helpers/pump_app.dart';
 
-/// Registration carries the platform's two hardest rules — 18+ and the
-/// women-must-supply-a-number requirement — so its gating is tested at the
-/// widget level rather than only in the validators.
+/// Registration carries the platform's hardest rules, so its gating is tested
+/// at the widget level rather than only in the validators.
+///
+/// The flow was rebuilt on 2026-08-14 to match the backend's six-field
+/// contract. Gender, date of birth and country are no longer collected at all —
+/// gender is forced server-side, age is a tickbox, and the country is derived
+/// from the WhatsApp number. The tests that asserted those steps are gone with
+/// them; what replaces them asserts the rules that actually still exist.
 void main() {
   Future<void> pumpJoin(
     WidgetTester tester,
@@ -23,86 +28,220 @@ void main() {
     );
   }
 
-  testWidgets('opens on the identity step', (tester) async {
-    await pumpJoin(tester, FakeAuthRepository());
-
-    expect(find.text('First, the basics'), findsOneWidget);
-    expect(find.text('Woman'), findsOneWidget);
-    expect(find.text('Man'), findsOneWidget);
-    expect(find.textContaining('18+ platform'), findsOneWidget);
-  });
-
-  testWidgets('cannot continue without a gender and a date of birth', (
-    tester,
-  ) async {
-    await pumpJoin(tester, FakeAuthRepository());
-
+  /// Fills step one and advances to the WhatsApp/bio step.
+  Future<void> completeAccountStep(WidgetTester tester) async {
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Username'),
+      'zainab_lagos',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Password'),
+      'password123',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Confirm password'),
+      'password123',
+    );
     final continueButton = find.widgetWithText(GradientButton, 'Continue');
+    await tester.ensureVisible(continueButton.first);
+    await tester.pumpAndSettle();
+    await tester.tap(continueButton.first);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('opens on the username step', (tester) async {
+    await pumpJoin(tester, FakeAuthRepository());
+
+    expect(find.text('Choose your name'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Username'), findsOneWidget);
+  });
+
+  testWidgets('warns that a forgotten password cannot be recovered', (
+    tester,
+  ) async {
+    // The single most consequential thing about the new flow: no email is
+    // collected, so /api/forgot-password has nothing to look a member up by.
+    // Saying so after the account exists would be saying so too late.
+    await pumpJoin(tester, FakeAuthRepository());
+
+    expect(find.textContaining('no way to reset a forgotten password'),
+        findsOneWidget);
+  });
+
+  testWidgets('will not advance past an invalid username', (tester) async {
+    final repository = FakeAuthRepository();
+    await pumpJoin(tester, repository);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Username'),
+      'x',
+    );
+    final continueButton = find.widgetWithText(GradientButton, 'Continue');
+    await tester.ensureVisible(continueButton.first);
+    await tester.pumpAndSettle();
+    await tester.tap(continueButton.first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose your name'), findsOneWidget);
+    expect(repository.joinCalls, isEmpty);
+  });
+
+  testWidgets('requires the two passwords to match', (tester) async {
+    await pumpJoin(tester, FakeAuthRepository());
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Username'),
+      'zainab_lagos',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Password'),
+      'password123',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Confirm password'),
+      'password124',
+    );
+    final continueButton = find.widgetWithText(GradientButton, 'Continue');
+    await tester.ensureVisible(continueButton.first);
+    await tester.pumpAndSettle();
+    await tester.tap(continueButton.first);
+    await tester.pump();
+
+    expect(find.text('Passwords do not match.'), findsOneWidget);
+  });
+
+  testWidgets('explains that the number places the member in discovery', (
+    tester,
+  ) async {
+    await pumpJoin(tester, FakeAuthRepository());
+    await completeAccountStep(tester);
+
+    expect(find.text('How members reach you'), findsOneWidget);
+    // Not decoration: discovery scopes on the country resolved from this
+    // number, so a member whose number does not resolve is listed nowhere.
+    expect(find.textContaining('place you in local discovery'), findsOneWidget);
+    expect(find.textContaining('never shown to other members'), findsOneWidget);
+  });
+
+  testWidgets('rejects a number that is not in international format', (
+    tester,
+  ) async {
+    final repository = FakeAuthRepository();
+    await pumpJoin(tester, repository);
+    await completeAccountStep(tester);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'WhatsApp number'),
+      '08012345678',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'About you'),
+      'Hello there.',
+    );
+    final continueButton = find.widgetWithText(GradientButton, 'Continue');
+    await tester.ensureVisible(continueButton.first);
+    await tester.pumpAndSettle();
+    await tester.tap(continueButton.first);
+    await tester.pumpAndSettle();
+
+    // Still on the same step, and nothing has been sent.
+    expect(find.text('How members reach you'), findsOneWidget);
+    expect(repository.joinCalls, isEmpty);
+  });
+
+  testWidgets('the submit button stays disabled until 18+ is confirmed', (
+    tester,
+  ) async {
+    final repository = FakeAuthRepository();
+    await pumpJoin(tester, repository, size: TestDevices.iPadPro);
+    await completeAccountStep(tester);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'WhatsApp number'),
+      '+2348012345678',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'About you'),
+      'Hello there.',
+    );
+    final continueButton = find.widgetWithText(GradientButton, 'Continue');
+    await tester.ensureVisible(continueButton.first);
+    await tester.pumpAndSettle();
+    await tester.tap(continueButton.first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('What you offer'), findsOneWidget);
+
+    final submit = find.widgetWithText(GradientButton, 'Create my account');
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+
+    // Neither a service nor the tickbox yet.
     expect(
-      tester.widget<GradientButton>(continueButton).onPressed,
+      tester.widget<GradientButton>(submit).onPressed,
       isNull,
-      reason: 'the step must not advance before both are chosen',
+      reason: 'the backend rejects isAdult != true outright',
     );
+
+    // Selecting a service alone is still not enough.
+    final chip = find.widgetWithText(FilterChip, 'Dinner Dates');
+    await tester.ensureVisible(chip);
+    await tester.pumpAndSettle();
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    expect(tester.widget<GradientButton>(submit).onPressed, isNull);
+
+    expect(repository.joinCalls, isEmpty);
   });
 
-  testWidgets('explains that a woman profile is public and reviewed', (
+  testWidgets('sends the six fields the backend actually reads', (
     tester,
   ) async {
-    await pumpJoin(tester, FakeAuthRepository());
+    final repository = FakeAuthRepository();
+    await pumpJoin(tester, repository, size: TestDevices.iPadPro);
+    await completeAccountStep(tester);
 
-    await tester.tap(find.text('Woman'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.textContaining('featured for its first 24 hours'),
-      findsOneWidget,
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'WhatsApp number'),
+      '+2348012345678',
     );
-    expect(find.textContaining('reviewed by a moderator'), findsOneWidget);
-  });
-
-  testWidgets('explains that a man profile stays private', (tester) async {
-    await pumpJoin(tester, FakeAuthRepository());
-
-    await tester.tap(find.text('Man'));
-    await tester.pumpAndSettle();
-
-    // Men's profiles are created with isPublic: false and never listed. Saying
-    // so at sign-up avoids someone joining and wondering why they are invisible.
-    expect(find.textContaining('never listed publicly'), findsOneWidget);
-  });
-
-  testWidgets('the date picker cannot offer a date under 18 years ago', (
-    tester,
-  ) async {
-    await pumpJoin(tester, FakeAuthRepository(), size: TestDevices.iPadPro);
-
-    await tester.tap(find.text('Woman'));
-    await tester.pumpAndSettle();
-
-    final field = find.text('Select your date of birth');
-    await tester.ensureVisible(field);
-    await tester.pumpAndSettle();
-    await tester.tap(field);
-    await tester.pumpAndSettle();
-
-    // The picker's bound is the visible half of the 18+ rule — it is not
-    // possible to *choose* an underage date. The server enforces the other
-    // half regardless of what reaches it.
-    expect(find.byType(DatePickerDialog), findsOneWidget);
-    final dialog = tester.widget<DatePickerDialog>(
-      find.byType(DatePickerDialog),
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'About you'),
+      'Jollof and jazz.',
     );
-    final now = DateTime.now();
-    final latestLegal = DateTime(now.year - 18, now.month, now.day);
-    expect(dialog.lastDate.isAfter(latestLegal), isFalse);
-  });
+    final continueButton = find.widgetWithText(GradientButton, 'Continue');
+    await tester.ensureVisible(continueButton.first);
+    await tester.pumpAndSettle();
+    await tester.tap(continueButton.first);
+    await tester.pumpAndSettle();
 
-  testWidgets('a country is preselected, because discovery is scoped by it', (
-    tester,
-  ) async {
-    await pumpJoin(tester, FakeAuthRepository());
-    expect(find.text('Nigeria'), findsOneWidget);
-    expect(find.textContaining('scoped by country'), findsOneWidget);
+    final chip = find.widgetWithText(FilterChip, 'Dinner Dates');
+    await tester.ensureVisible(chip);
+    await tester.pumpAndSettle();
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+
+    final tickbox = find.byType(CheckboxListTile);
+    await tester.ensureVisible(tickbox);
+    await tester.pumpAndSettle();
+    await tester.tap(tickbox);
+    await tester.pumpAndSettle();
+
+    final submit = find.widgetWithText(GradientButton, 'Create my account');
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(repository.joinCalls, hasLength(1));
+    final call = repository.joinCalls.single;
+    expect(call['username'], 'zainab_lagos');
+    expect(call['phone'], '+2348012345678');
+    expect(call['bio'], 'Jollof and jazz.');
+    expect(call['services'], <String>['dinner_dates']);
+    expect(call['isAdult'], isTrue);
   });
 
   testWidgets('never calls join before every step is satisfied', (

@@ -60,10 +60,10 @@ class FakeAuthRepository extends AuthRepository {
 
   @override
   Future<AuthSession> signIn({
-    required String email,
+    required String identifier,
     required String password,
   }) async {
-    signInCalls.add((email.trim().toLowerCase(), password));
+    signInCalls.add((identifier.trim().toLowerCase(), password));
     final error = signInError;
     if (error != null) throw error;
     return _session;
@@ -71,32 +71,25 @@ class FakeAuthRepository extends AuthRepository {
 
   @override
   Future<JoinResult> join({
-    required String email,
-    required String password,
-    required String displayName,
     required String username,
-    required DateTime birthDate,
-    required Gender gender,
-    required String countryCode,
-    String? city,
-    String? phone,
-    String? bio,
-    String? tagline,
-    List<String> dateTypes = const <String>[],
-    InterestedIn? interestedIn,
+    required String password,
+    required String phone,
+    required String bio,
+    required List<String> services,
+    required bool isAdult,
     String? referralCode,
   }) async {
     joinCalls.add(<String, Object?>{
-      'email': email,
       'username': username,
-      'gender': gender,
-      'birthDate': birthDate,
-      'countryCode': countryCode,
       'phone': phone,
+      'bio': bio,
+      'services': services,
+      'isAdult': isAdult,
+      'referralCode': referralCode,
     });
     final error = joinError;
     if (error != null) throw error;
-    return const JoinResult(userId: 'test-user');
+    return JoinResult(userId: 'test-user', username: username);
   }
 
   @override

@@ -24,7 +24,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordFocus = FocusNode();
 
@@ -34,7 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     _passwordFocus.dispose();
     super.dispose();
@@ -54,7 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref
           .read(authControllerProvider.notifier)
           .signIn(
-            email: _emailController.text,
+            identifier: _identifierController.text,
             password: _passwordController.text,
           );
       if (!mounted) return;
@@ -140,18 +140,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: AppSpacing.lg),
                   ],
 
+                  // Username *or* email. Registration stopped collecting an
+                  // address on 2026-08-14, so most accounts now have only a
+                  // username — but every account created before that has an
+                  // address people still expect to type. The backend accepts
+                  // either and distinguishes them by the "@".
+                  //
+                  // `username` rather than `email` as the autofill hint: it is
+                  // the field most members now have, and a password manager
+                  // offering an email for a username box is the more confusing
+                  // of the two failure modes.
                   TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
+                    controller: _identifierController,
+                    keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.next,
-                    autofillHints: const <String>[AutofillHints.email],
+                    autofillHints: const <String>[AutofillHints.username],
                     autocorrect: false,
                     decoration: const InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'you@example.com',
-                      prefixIcon: Icon(Icons.alternate_email_rounded, size: 20),
+                      labelText: 'Username or email',
+                      hintText: 'yourname',
+                      prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
                     ),
-                    validator: Validators.email,
+                    validator: Validators.loginIdentifier,
                     onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
                   ),
                   const SizedBox(height: AppSpacing.lg),

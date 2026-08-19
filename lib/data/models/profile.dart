@@ -1,6 +1,9 @@
+import '../../core/constants/services.dart';
 import 'enums.dart';
 import 'json.dart';
 import 'media_item.dart';
+import 'presence.dart';
+import 'rates.dart';
 
 /// A profile as seen by someone else.
 ///
@@ -25,6 +28,13 @@ class ProfileSummary {
     this.ethnicity,
     this.relationshipIntent,
     this.dateTypes = const <String>[],
+    this.services = const <String>[],
+    this.state,
+    this.build,
+    this.languages = const <String>[],
+    this.rates = MemberRates.empty,
+    this.presence = Presence.away,
+    this.viewCount = 0,
     this.prompts = const <String, String>{},
     this.isAvailableToday = false,
     this.isRedHot = false,
@@ -49,7 +59,32 @@ class ProfileSummary {
   final String? height;
   final String? ethnicity;
   final RelationshipIntent? relationshipIntent;
+  /// **Deprecated.** The pre-2026-08-13 "Preferred Date Activities", kept
+  /// because existing rows hold real choices. Nothing writes to it any more —
+  /// [services] replaced it. Read-only here for the same reason.
   final List<String> dateTypes;
+
+  /// Catalogue ids from `lib/core/constants/services.dart` — never labels.
+  /// Render with [serviceOptions] rather than printing these raw.
+  final List<String> services;
+
+  /// Subdivision within the country (a Nigerian state, a UK nation...).
+  final String? state;
+
+  /// Body type, from the website's `BUILD_OPTIONS`.
+  final String? build;
+
+  final List<String> languages;
+
+  /// What the member charges. Check [MemberRates.isVisible] before rendering —
+  /// the member can switch the whole block off.
+  final MemberRates rates;
+
+  /// A coarse activity bucket. Never a timestamp — see [Presence].
+  final Presence presence;
+
+  final int viewCount;
+
   final Map<String, String> prompts;
 
   final bool isAvailableToday;
@@ -65,6 +100,10 @@ class ProfileSummary {
   final DateTime? createdAt;
 
   bool get isVerified => verificationStatus.isVerified;
+
+  /// The member's services as catalogue entries, in catalogue order. Retired
+  /// entries are included so a profile keeps rendering everything it holds.
+  List<ServiceOption> get serviceOptions => servicesForIds(services);
 
   List<MediaItem> get photos =>
       media.where((m) => !m.isVideo && m.hasUrl).toList(growable: false);
@@ -119,6 +158,15 @@ class ProfileSummary {
         profile['relationshipIntent'],
       ),
       dateTypes: asStringList(profile['dateTypes']),
+      services: asStringList(profile['services']),
+      state: asStringOrNull(profile['state']),
+      build: asStringOrNull(profile['build']),
+      languages: asStringList(profile['languages']),
+      rates: MemberRates.fromProfileJson(profile),
+      // Presence sits on the user, not the dating profile: it is a bucket of
+      // `users.lastSeenAt`, which the server never sends raw.
+      presence: Presence.parse(json['presence']),
+      viewCount: asIntOrNull(profile['viewCount']) ?? 0,
       prompts: _readPrompts(profile['prompts']),
       isAvailableToday: asBool(profile['isAvailableToday']),
       isRedHot: asBool(profile['isRedHot']),

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../core/constants/services.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/session_store.dart';
@@ -74,22 +75,42 @@ class AuthRepository {
     return token;
   }
 
-  /// Signs in with email and password.
+  /// Signs in with a username *or* an email address, and a password.
+  ///
+  /// **The field is `identifier`, not `email`.** Registration stopped
+  /// collecting an address on 2026-08-14 (migration
+  /// `20260814000000_emailless_signup`), so `authorize()` in the website's
+  /// `src/lib/auth.ts` now reads `credentials.identifier` and decides which
+  /// column to look in by whether the value contains an "@":
+  ///
+  /// ```ts
+  /// const where = value.includes("@") ? { email: value } : { username: value };
+  /// ```
+  ///
+  /// Posting `email` leaves `credentials.identifier` undefined, `authorize()`
+  /// returns null on its first guard, and **every sign-in fails with 401** — a
+  /// wrong password and a wrong field name are indistinguishable from here.
+  /// That is exactly what the app shipped with, which is why no signed-in flow
+  /// could ever have worked against the current backend.
+  ///
+  /// The value is lowercased because both columns are stored folded: emails on
+  /// write, usernames by a database CHECK. The website folds it the same way
+  /// before querying.
   ///
   /// Verified against production: with `json=true` the credentials callback
   /// answers **401** for a bad credential and 200 with a session cookie for a
   /// good one. Because `authorize()` also refuses inactive and banned accounts,
   /// a 401 here covers "wrong password" and "suspended" alike — and it must stay
-  /// one message, since distinguishing them would confirm an address exists.
+  /// one message, since distinguishing them would confirm an account exists.
   ///
   /// The generic 401 handling in [ApiClient] would fire the session-invalidated
   /// callback on that failure, so it is caught here: a failed sign-in attempt is
   /// not an expired session.
   Future<AuthSession> signIn({
-    required String email,
+    required String identifier,
     required String password,
   }) async {
-    final normalizedEmail = email.trim().toLowerCase();
+    final normalized = identifier.trim().toLowerCase();
     final token = await _csrfToken();
 
     try {
@@ -97,7 +118,7 @@ class AuthRepository {
         '/api/auth/callback/credentials',
         body: <String, String>{
           'csrfToken': token,
-          'email': normalizedEmail,
+          'identifier': normalized,
           'password': password,
           'json': 'true',
           'redirect': 'false',
@@ -112,7 +133,7 @@ class AuthRepository {
           error.kind == ApiErrorKind.forbidden) {
         throw const ApiException(
           kind: ApiErrorKind.validation,
-          message: 'Incorrect email or password.',
+          message: 'Incorrect username or password.',
         );
       }
       rethrow;
@@ -124,7 +145,7 @@ class AuthRepository {
     if (session == null) {
       throw const ApiException(
         kind: ApiErrorKind.validation,
-        message: 'Incorrect email or password.',
+        message: 'Incorrect username or password.',
       );
     }
     return session;
@@ -132,54 +153,71 @@ class AuthRepository {
 
   /// Creates a member account through `/api/member/join`.
   ///
-  /// This is the route the website's own signup form uses, and the only one that
-  /// grants the welcome credits, sets the 24-hour featured window and applies a
-  /// referral code. Age is validated server-side; the client check below only
-  /// saves a round trip.
+  /// **Six fields, and no email address.** The route was rebuilt on
+  /// 2026-08-14 (migration `20260814000000_emailless_signup`) down to
+  /// username, password, WhatsApp number, bio, services and an 18+
+  /// confirmation. Email, date of birth, gender, country and display name were
+  /// all removed from it — sending them is harmless but pointless, and the
+  /// four fields this app used to send as *required* are simply not read any
+  /// more.
+  ///
+  /// Three consequences worth knowing before changing anything here:
+  ///
+  /// - **`isAdult` must be `true`** or the route rejects the request outright.
+  ///   It is an assertion by the member, not a verification by us; its whole
+  ///   value is that there is a record the question was asked and answered.
+  /// - **There is no password-reset path for accounts created this way.**
+  ///   `/api/forgot-password` looks a member up by address and there is
+  ///   nothing to look up, so a forgotten password is a lost account. The join
+  ///   screen says so before the member commits.
+  /// - **The country comes from the phone number**, resolved server-side by
+  ///   `countryFromPhone`. Discovery scopes on `countryCode`, so a member
+  ///   whose number does not resolve is discoverable by nobody until they set
+  ///   a location in Edit Profile.
+  ///
+  /// Gender is forced to `WOMAN` server-side. This route only creates the
+  /// listing accounts; it is not a general registration endpoint.
   Future<JoinResult> join({
-    required String email,
-    required String password,
-    required String displayName,
     required String username,
-    required DateTime birthDate,
-    required Gender gender,
-    required String countryCode,
-    String? city,
-    String? phone,
-    String? bio,
-    String? tagline,
-    List<String> dateTypes = const <String>[],
-    InterestedIn? interestedIn,
+    required String password,
+    required String phone,
+    required String bio,
+    required List<String> services,
+    required bool isAdult,
     String? referralCode,
   }) async {
-    final ageError = Validators.birthDate(birthDate);
-    if (ageError != null) {
-      throw ApiException(
+    // Checked here as well as server-side so the member is not told "you must
+    // confirm you are 18" by a round trip they could have been spared.
+    if (!isAdult) {
+      throw const ApiException(
         kind: ApiErrorKind.validation,
-        message: ageError,
-        field: 'birthDate',
+        message:
+            'You must confirm that you are 18 or over to create a profile.',
+        field: 'isAdult',
+      );
+    }
+
+    // Whitelisted against the catalogue before sending. The backend does this
+    // too — doing it here means an id retired since the screen was built is
+    // dropped quietly rather than failing the whole registration.
+    final List<String> cleanServices = sanitizeServiceIds(services);
+    if (cleanServices.isEmpty) {
+      throw const ApiException(
+        kind: ApiErrorKind.validation,
+        message: 'Select at least one service.',
+        field: 'services',
       );
     }
 
     final json = await _api.postJson(
       '/api/member/join',
       body: <String, dynamic>{
-        'email': email.trim().toLowerCase(),
-        'password': password,
-        'displayName': displayName.trim(),
         'username': UsernameRules.normalize(username),
-        // Date only — the backend parses it with `new Date(...)`, and sending a
-        // local timestamp could shift the day across a timezone boundary.
-        'birthDate': _dateOnly(birthDate),
-        'gender': gender.wire,
-        'country': countryCode,
-        if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
-        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
-        if (bio != null && bio.trim().isNotEmpty) 'bio': bio.trim(),
-        if (tagline != null && tagline.trim().isNotEmpty)
-          'tagline': tagline.trim(),
-        if (dateTypes.isNotEmpty) 'dateTypes': dateTypes,
-        if (interestedIn != null) 'interestedIn': interestedIn.wire,
+        'password': password,
+        'phone': phone.trim(),
+        'bio': bio.trim(),
+        'services': cleanServices,
+        'isAdult': true,
         if (referralCode != null && referralCode.trim().isNotEmpty)
           'referralCode': referralCode.trim().toUpperCase(),
       },
@@ -187,6 +225,8 @@ class AuthRepository {
 
     return JoinResult(
       userId: asString(json['userId']),
+      username: asStringOrNull(json['username']),
+      countryCode: asStringOrNull(json['countryCode']),
       referralCode: asStringOrNull(json['referralCode']),
       message: asStringOrNull(json['message']),
     );
@@ -280,11 +320,6 @@ class AuthRepository {
       await _api.sessionStore.clear();
     }
   }
-
-  static String _dateOnly(DateTime value) =>
-      '${value.year.toString().padLeft(4, '0')}-'
-      '${value.month.toString().padLeft(2, '0')}-'
-      '${value.day.toString().padLeft(2, '0')}';
 }
 
 /// What `/api/auth/session` returns: the JWT's public claims.
@@ -329,9 +364,25 @@ class AuthSession {
 }
 
 class JoinResult {
-  const JoinResult({required this.userId, this.referralCode, this.message});
+  const JoinResult({
+    required this.userId,
+    this.username,
+    this.countryCode,
+    this.referralCode,
+    this.message,
+  });
 
   final String userId;
+
+  /// The normalised username the account was actually created with — the
+  /// member may have typed a different case.
+  final String? username;
+
+  /// Resolved from the WhatsApp number server-side. **Null means discovery
+  /// cannot place them**, and the join flow says so rather than leaving them
+  /// invisible without explanation.
+  final String? countryCode;
+
   final String? referralCode;
   final String? message;
 }

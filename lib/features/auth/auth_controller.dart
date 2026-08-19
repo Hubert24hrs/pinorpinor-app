@@ -90,47 +90,49 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> signIn({required String email, required String password}) async {
-    final session = await _repository.signIn(email: email, password: password);
+  /// [identifier] is a username or an email address — the backend decides
+  /// which column to search by looking for an "@".
+  Future<void> signIn({
+    required String identifier,
+    required String password,
+  }) async {
+    final session = await _repository.signIn(
+      identifier: identifier,
+      password: password,
+    );
     state = AuthState(phase: AuthPhase.signedIn, session: session);
   }
 
   /// Registers, then signs the new member straight in so onboarding continues
   /// without a second credential prompt.
+  ///
+  /// The sign-in uses the **username**, because that is now the only
+  /// identifier the account has — see [AuthRepository.join].
   Future<JoinResult> join({
-    required String email,
-    required String password,
-    required String displayName,
     required String username,
-    required DateTime birthDate,
-    required Gender gender,
-    required String countryCode,
-    String? city,
-    String? phone,
-    String? bio,
-    String? tagline,
-    List<String> dateTypes = const <String>[],
-    InterestedIn? interestedIn,
+    required String password,
+    required String phone,
+    required String bio,
+    required List<String> services,
+    required bool isAdult,
     String? referralCode,
   }) async {
     final result = await _repository.join(
-      email: email,
-      password: password,
-      displayName: displayName,
       username: username,
-      birthDate: birthDate,
-      gender: gender,
-      countryCode: countryCode,
-      city: city,
+      password: password,
       phone: phone,
       bio: bio,
-      tagline: tagline,
-      dateTypes: dateTypes,
-      interestedIn: interestedIn,
+      services: services,
+      isAdult: isAdult,
       referralCode: referralCode,
     );
 
-    await signIn(email: email, password: password);
+    // The server normalises the username; sign in with what it stored rather
+    // than with what was typed.
+    await signIn(
+      identifier: result.username ?? username,
+      password: password,
+    );
     return result;
   }
 
