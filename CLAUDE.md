@@ -51,6 +51,17 @@ website's source, read it off the website's source.
 | Permanent deletion | `/api/account` | Settings offers deactivate *and* delete, the latter password-confirmed |
 | Date proposals | `/api/dates` | `DatesRepository` |
 
+### Also landed 2026-08-20
+
+| What | Why it mattered |
+| --- | --- |
+| The platform menu | Five tabs, no drawer — most of the website was unreachable from a phone |
+| Online Now, Videos, Locations | New screens. `online()` existed as a repository method with **no caller** |
+| Deep links for every website section | `/faq`, `/videos`, `/events`, `/rooms`, `/feeds` all opened a bogus profile lookup |
+| `/favorites` guarded | Deep-linkable but unprotected, so a signed-out visitor was told their *session* expired |
+| Shortlist cleared on sign-out | `savedIdsProvider` survived the session; the next person on a shared phone saw the previous member's saved profiles |
+| Profile edits actually save | `updateProfile` sent `dateTypes`, which `profileUpdateSchema` refuses; zod strips unknown keys silently, so every save "worked" and discarded the selection |
+
 **Pick up here:** the device-test checklist under "Next steps". Launch on real
 hardware is *still* unconfirmed — see "Verification status", which is honest
 about what that means.
@@ -70,6 +81,53 @@ The build is `--target-platform android-arm64` only, because a universal build
 kept timing out on this machine. That covers essentially every phone from 2016
 onward; `INSTALL_FAILED_NO_MATCHING_ABIS` means the fix is a universal build,
 not a code change.
+
+---
+
+## The menu mirrors the website, and two files must move together
+
+`lib/core/constants/navigation.dart` is a copy of the website's
+`src/lib/navigation.ts` — same four sections, same order, same labels, with
+Material equivalents of its Lucide icons. The website renders its sidebar *and*
+its mobile drawer from that one file precisely so the two cannot drift; this is
+the app's third reader of the same list.
+
+Until 2026-08-20 the app had five tabs and **no menu at all**, so Online Now,
+Videos, Locations, Reviews, FAQ, Safety and every Explore entry were
+unreachable from a phone. `test/unit/navigation_test.dart` reads the real
+TypeScript and fails when an entry exists there and not here.
+
+Each entry declares how it opens, so nothing in the menu is decorative:
+
+- `native` — the app has a screen.
+- `placeholder` — **the website has not built it either.** Feeds, Events,
+  Rooms, Adverts and Testimonials are its own `SectionPlaceholder` stubs, and
+  the app repeats its wording verbatim so a member never gets two different
+  explanations for the same absence.
+- `website` — static content opens the real page, marked with an
+  open-in-new glyph.
+
+`/admin` is deliberately absent. An app carrying moderation tooling is an app
+whose compromise carries it too.
+
+### Adding a website section? Three files, same commit
+
+This is the trap. Every section slug is a valid username shape
+(`^[a-z0-9_]{3,20}$`), so a slug with no explicit case in `DeepLinks.resolve`
+falls through to the username branch and opens **a profile lookup for a member
+of that name** — `pinorpinor.com/faq` landed on "profile not found", and so did
+`/videos`, `/events`, `/rooms` and `/feeds`.
+
+1. `lib/core/constants/navigation.dart` — the menu entry.
+2. `lib/core/routing/deep_links.dart` — claim it, or decline it explicitly.
+   Never leave it to the default branch.
+3. `lib/core/routing/app_routes.dart` — if its endpoint needs a session, add it
+   to `protectedPrefixes`. `/api/favorites` does, and without the guard a
+   signed-out visitor arriving by deep link is told their *session expired*,
+   because `ApiClient` reads the resulting 401 as an invalidated session.
+
+`deep_links_test.dart` reads the website's `src/app` directory and fails if any
+top-level page resolves to a profile lookup for its own slug.
 
 ---
 
