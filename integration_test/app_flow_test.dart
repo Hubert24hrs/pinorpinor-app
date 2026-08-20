@@ -106,14 +106,55 @@ void main() {
     await tester.tap(find.text('Messages').last);
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
+    // The field accepts a username *or* an email, and validates as an email
+    // only when an "@" is present — that is how the backend decides which
+    // column to search. So the value that must fail here is a malformed
+    // address, not a bare word: "nonsense" is a perfectly good username.
+    //
+    // This test drove the pre-2026-08-14 screen until now, looking for a field
+    // labelled "Email" that no longer exists. It would have failed on the first
+    // device run, which is the run it exists to support.
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Email'),
-      'nonsense',
+      find.widgetWithText(TextFormField, 'Username or email'),
+      'nonsense@',
     );
     await tester.tap(find.text('Sign in').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Please enter a valid email address.'), findsOneWidget);
+  });
+
+  testWidgets('a bare username is accepted, since most accounts have no email', (
+    tester,
+  ) async {
+    // Registration stopped collecting an address on 2026-08-14. Validating
+    // this field as an email would lock out every account created since.
+    await launchApp(tester);
+
+    await tester.tap(find.text('Messages').last);
+    await tester.pumpAndSettle(const Duration(seconds: 2));
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Username or email'),
+      'zainab_lagos',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Please enter a valid email address.'), findsNothing);
+  });
+
+  testWidgets('the menu reaches the sections the tabs do not', (tester) async {
+    // The five tabs cover a fraction of the platform. Everything else --
+    // Online Now, Videos, Locations, FAQ, Safety -- is behind the drawer, so
+    // a device run should confirm it opens and is populated.
+    await launchApp(tester);
+
+    await tester.tap(find.byTooltip('Open navigation menu').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Online Now'), findsOneWidget);
+    expect(find.text('Member Discovery'), findsOneWidget);
+    expect(find.text('EXPLORE'), findsOneWidget);
   });
 }
 
