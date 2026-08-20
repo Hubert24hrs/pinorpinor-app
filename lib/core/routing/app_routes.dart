@@ -41,6 +41,10 @@ class AppRoutes {
   static const contactRequests = '/contact-requests';
   static const matches = '/matches';
   static const favorites = '/favorites';
+  static const live = '/live';
+  static const videos = '/videos';
+  static const locations = '/locations';
+  static const section = '/section';
 
   // Settings
   static const settings = '/settings';

@@ -14,6 +14,7 @@ import '../../shared/widgets/profile_image.dart';
 import '../../shared/widgets/states.dart';
 import '../auth/auth_controller.dart';
 import '../discovery/discovery_providers.dart';
+import '../shell/app_drawer.dart';
 
 /// The landing screen, reproducing the website's homepage in mobile form:
 /// a hero, the Face of the Day, a rail of new and boosted members, and the
@@ -30,6 +31,8 @@ class HomeScreen extends ConsumerWidget {
     final locations = ref.watch(locationsProvider);
 
     return Scaffold(
+      // The SliverAppBar below picks up the hamburger from this automatically.
+      drawer: const AppDrawer(),
       backgroundColor: AppColors.bgPrimary,
       body: RefreshIndicator(
         color: AppColors.rose,

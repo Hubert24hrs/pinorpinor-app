@@ -13,6 +13,7 @@ import '../../shared/widgets/states.dart';
 import '../auth/auth_controller.dart';
 import '../auth/login_screen.dart';
 import 'account_providers.dart';
+import '../shell/app_drawer.dart';
 
 /// The member's own hub: their profile at a glance, verification status, media,
 /// credits and the route into settings.
@@ -24,6 +25,7 @@ class AccountScreen extends ConsumerWidget {
     final account = ref.watch(myProfileProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
         title: const Text('Your profile'),
@@ -167,7 +169,7 @@ class _AccountBody extends ConsumerWidget {
               _MenuItem(
                 icon: Icons.edit_outlined,
                 label: 'Edit profile',
-                subtitle: 'Bio, tagline, city, date ideas',
+                subtitle: 'Bio, tagline, city, services and rates',
                 onTap: () => context.push(AppRoutes.editProfile),
               ),
               if (account.canUploadMedia)
@@ -175,7 +177,7 @@ class _AccountBody extends ConsumerWidget {
                   icon: Icons.photo_library_outlined,
                   label: 'Photos and videos',
                   subtitle:
-                      '${account.media.length} uploaded · reviewed before publishing',
+                      '${account.media.length} uploaded · live as soon as they finish',
                   onTap: () => context.push(AppRoutes.manageMedia),
                 ),
               _MenuItem(
@@ -191,6 +193,14 @@ class _AccountBody extends ConsumerWidget {
                 label: 'Contact requests',
                 subtitle: 'Who has asked to reach you on WhatsApp',
                 onTap: () => context.push(AppRoutes.contactRequests),
+              ),
+              _MenuItem(
+                icon: Icons.favorite_outline_rounded,
+                label: 'Saved profiles',
+                // States the privacy property on the way in, because the first
+                // thing anyone wonders about a shortlist is who else can see it.
+                subtitle: 'Your shortlist. Only you can see it',
+                onTap: () => context.push(AppRoutes.favorites),
               ),
               _MenuItem(
                 icon: Icons.bolt_outlined,

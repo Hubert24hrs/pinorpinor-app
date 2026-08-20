@@ -13,6 +13,7 @@ import '../../shared/widgets/profile_card.dart';
 import '../../shared/widgets/states.dart';
 import '../auth/auth_controller.dart';
 import 'discovery_providers.dart';
+import '../shell/app_drawer.dart';
 
 /// The browse grid, reproducing `/discover` on the website.
 ///
@@ -86,10 +87,17 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     );
 
     return Scaffold(
+      drawer: const AppDrawer(),
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
         title: const Text('Discover'),
         actions: <Widget>[
+          // Works signed out, like the grid — /api/public/online is public.
+          IconButton(
+            icon: const Icon(Icons.podcasts_rounded),
+            tooltip: 'Online now',
+            onPressed: () => context.push(AppRoutes.live),
+          ),
           // The deck needs a session; offering it signed-out would land on a
           // prompt. The grid is the surface that works for everyone.
           if (signedIn)

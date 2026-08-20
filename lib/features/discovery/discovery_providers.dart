@@ -114,6 +114,23 @@ final spotlightProvider = FutureProvider.autoDispose<Spotlight>((ref) async {
   return ref.watch(discoveryRepositoryProvider).spotlight();
 });
 
+/// Whether the Live screen is showing only the five-minute window.
+///
+/// Defaults to false, matching the website: on a platform this young a strict
+/// filter renders an empty page most of the time, and every member carries
+/// their real [Presence] bucket anyway, so nothing is labelled "online" that
+/// is not.
+final liveStrictProvider = StateProvider<bool>((ref) => false);
+
+/// Members who are online, or were recently — the app's equivalent of the
+/// website's `/live`.
+final liveProvider = FutureProvider.autoDispose<ProfilePage>((ref) async {
+  final strict = ref.watch(liveStrictProvider);
+  return ref
+      .watch(discoveryRepositoryProvider)
+      .online(strictlyOnline: strict, limit: 24);
+});
+
 final locationsProvider = FutureProvider.autoDispose<List<LocationCount>>((
   ref,
 ) async {

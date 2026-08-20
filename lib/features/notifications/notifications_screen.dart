@@ -13,6 +13,7 @@ import '../../data/models/enums.dart';
 import '../../data/models/notifications.dart';
 import '../../shared/widgets/states.dart';
 import 'notification_providers.dart';
+import '../shell/app_drawer.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -24,6 +25,7 @@ class NotificationsScreen extends ConsumerWidget {
     final pendingRequests = contactRequests.valueOrNull?.pendingCount ?? 0;
 
     return Scaffold(
+      drawer: const AppDrawer(),
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
         title: const Text('Alerts'),

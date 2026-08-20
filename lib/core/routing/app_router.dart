@@ -11,6 +11,9 @@ import '../../features/credits/credits_screen.dart';
 import '../../features/discovery/discover_screen.dart';
 import '../../features/discovery/swipe_screen.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/discovery/live_screen.dart';
+import '../../features/discovery/locations_screen.dart';
+import '../../features/discovery/videos_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/media/manage_media_screen.dart';
@@ -182,6 +185,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.favorites,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const FavoritesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.live,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const LiveScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.videos,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const VideosScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.locations,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const LocationsScreen(),
       ),
       GoRoute(
         path: AppRoutes.editProfile,

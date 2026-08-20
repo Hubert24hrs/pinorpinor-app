@@ -12,6 +12,7 @@ import '../../shared/widgets/profile_image.dart';
 import '../../shared/widgets/states.dart';
 import '../auth/auth_controller.dart';
 import 'messaging_providers.dart';
+import '../shell/app_drawer.dart';
 
 /// The conversation list.
 ///
@@ -28,6 +29,7 @@ class MessagesScreen extends ConsumerWidget {
     final me = ref.watch(authControllerProvider).userId ?? '';
 
     return Scaffold(
+      drawer: const AppDrawer(),
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
         title: const Text('Messages'),

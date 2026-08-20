@@ -5,7 +5,7 @@
 > codebase. Trust the source over this file where they disagree, and update this
 > file when they do.
 
-Last verified: **2026-08-20**. Analyzer clean, **222 tests passing**, debug APK
+Last verified: **2026-08-20**. Analyzer clean, **230 tests passing**, debug APK
 builds. Local: `C:\Users\HP\.gemini\antigravity-ide\scratch\pinorpinor-app`.
 Repository: `https://github.com/Hubert24hrs/pinorpinor-app`, branch `main`.
 
@@ -288,7 +288,7 @@ licences included), not fetched at runtime.
 
 ```bash
 flutter analyze     # expect: No issues found
-flutter test        # expect: 222 passing
+flutter test        # expect: 230 passing
 flutter build apk --debug
 ```
 
@@ -312,7 +312,7 @@ reports on a live platform with real members would be worse than none.
 | Area | Status |
 | --- | --- |
 | `flutter analyze` | Clean |
-| `flutter test` | 222 passing |
+| `flutter test` | 230 passing |
 | Debug APK | Builds (116.1 MB, arm64, 49.7s incremental) |
 | Release `.aab` | **Not run** — needs the owner's `android/key.properties` |
 | iOS build | **Blocked** — needs macOS + Xcode |
