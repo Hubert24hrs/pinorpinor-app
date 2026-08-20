@@ -109,20 +109,50 @@ class VideoEntry {
   final ProfileSummary owner;
 }
 
-/// Videos gathered from the public profile feed. See [VideosScreen] for why
-/// this is not the same query the website runs.
+/// How many profile pages to sweep for videos.
+///
+/// Videos are sparse — most members post photos only — so one page of profiles
+/// usually yields almost nothing. Three is a deliberate compromise: enough that
+/// the screen has content on a real platform, few enough that opening it is
+/// three requests rather than an unbounded crawl.
+const int _kVideoSweepPages = 3;
+
+/// Videos gathered from the public profile feed.
+///
+/// **This cannot be made exact from the client, and that is a property of the
+/// API rather than a shortcut.** `/api/public/profiles` selects only
+/// `id`, `storageKey`, `storageUrl` and `mediaType` for media, caps it at four
+/// items per profile, and orders by `order` — so there is **no timestamp to
+/// sort by**. "The 24 newest videos on the platform", which is what the website
+/// renders, is not expressible here at any effort.
+///
+/// What this does instead is sweep the first few pages of discovery and collect
+/// what they carry. Visibility is identical, because the same endpoint applies
+/// the same rules. Ordering and completeness are not.
 final videoFeedProvider = FutureProvider.autoDispose<List<VideoEntry>>((
   ref,
 ) async {
-  final page = await ref
-      .watch(discoveryRepositoryProvider)
-      .browse(limit: 30);
+  final repository = ref.watch(discoveryRepositoryProvider);
+  final entries = <VideoEntry>[];
+  final seen = <String>{};
 
-  return <VideoEntry>[
-    for (final ProfileSummary profile in page.profiles)
-      for (final MediaItem video in profile.videos)
-        VideoEntry(media: video, owner: profile),
-  ];
+  for (int page = 1; page <= _kVideoSweepPages; page++) {
+    final result = await repository.browse(page: page, limit: 30);
+
+    for (final ProfileSummary profile in result.profiles) {
+      for (final MediaItem video in profile.videos) {
+        // A profile can surface on more than one page while the feed shifts
+        // under paging; de-duplicate on the media id so nothing renders twice.
+        if (seen.add(video.id)) {
+          entries.add(VideoEntry(media: video, owner: profile));
+        }
+      }
+    }
+
+    if (page >= result.totalPages) break;
+  }
+
+  return entries;
 });
 
 class _VideoTile extends StatelessWidget {

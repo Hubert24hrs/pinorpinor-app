@@ -200,7 +200,7 @@ Also declare: encrypted in transit; deletion available in-app; **no tracking**;
 | Item | Status | Evidence |
 | --- | --- | --- |
 | `flutter analyze` | DONE | 0 issues, with lints tightened beyond `flutter_lints` |
-| `flutter test` | DONE | 230 tests passing |
+| `flutter test` | DONE | 239 tests passing |
 | `dart format` | DONE | Clean |
 | Android debug APK | DONE | `app-debug.apk`, 116.1 MB, arm64 |
 | Android release `.aab` | OWNER — needs `key.properties` | Config in place; falls back to debug signing without it |
@@ -267,7 +267,7 @@ Results from this repository:
 | Command | Result |
 | --- | --- |
 | `flutter analyze` | **No issues found** |
-| `flutter test` | **230 tests, all passing** |
+| `flutter test` | **239 tests, all passing** |
 | `dart format .` | Clean |
 | `flutter build apk --debug --target-platform android-arm64` | **Succeeded** — `build/app/outputs/flutter-apk/app-debug.apk`, 116.1 MB. 1367s cold, 50s incremental |
 | `flutter build appbundle --release` | **Not run** — needs `android/key.properties`, which only the owner can create |
