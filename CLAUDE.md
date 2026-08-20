@@ -495,8 +495,15 @@ In priority order:
    those belong to the owner. `android/key.properties` is absent, so a release
    build silently falls back to debug signing and Play will reject it — the
    intended failure mode.
-3. **Active-filter chips on Discover** — the second pattern worth taking from
-   the aura review, and the smaller half. The filter sheet exists; what is
-   missing is seeing and dropping one filter without reopening it.
+3. **Close the App Store 1.2 gap** — see `docs/STORE_READINESS.md`. Media
+   publishes before any human sees it, so the guideline's "filter objectionable
+   material *from being posted*" is not satisfied. This is **backend work** and
+   it is the likeliest cause of a store rejection, ahead of anything in the app.
+   Two workable shapes: hold first-time uploaders only, or put a classifier in
+   front of `/api/upload/confirm`.
 4. Owner: approve some real member media so discovery is not empty, and set the
    SMS provider key so phone verification can complete.
+
+*(Active-filter chips on Discover — the second aura pattern — are **done**;
+`_ActiveFilterChips` in `discover_screen.dart`, one chip per filter with its own
+clear, including one per selected service.)*
