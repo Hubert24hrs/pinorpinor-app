@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pinorpinor_app/core/routing/app_routes.dart';
 import 'package:pinorpinor_app/core/routing/deep_links.dart';
@@ -73,12 +75,18 @@ void main() {
     });
 
     test('marketing and legal pages stay on the web', () {
+      // `live` was in this list until the app grew an Online Now screen. It is
+      // now claimed — see "the sections the app now owns" below. Anything that
+      // remains here is content the app genuinely does not reproduce.
       for (final path in <String>[
         'about',
         'privacy',
         'terms',
         'safety',
-        'live',
+        'contact',
+        'faq',
+        'reviews',
+        'exclusive',
       ]) {
         expect(
           DeepLinks.resolve(Uri.parse('https://pinorpinor.com/$path')),
@@ -177,6 +185,111 @@ void main() {
       expect(AppRoutes.isAuthOnly('/login'), isTrue);
       expect(AppRoutes.isAuthOnly('/join'), isTrue);
       expect(AppRoutes.isAuthOnly('/home'), isFalse);
+    });
+  });
+
+  group('every website section is accounted for', () {
+    // The real hazard, and the reason this group reads the filesystem: every
+    // website section slug is a valid username shape (^[a-z0-9_]{3,20}$). A
+    // slug with no explicit case falls through to the username branch and
+    // opens a profile lookup for a member who does not exist, so
+    // pinorpinor.com/faq lands on "profile not found" rather than the FAQ.
+    //
+    // This shipped: /videos, /faq, /events, /rooms and /feeds all misrouted
+    // that way, and /live and /locations returned null after the app had grown
+    // screens for both.
+    final websiteApp = Directory('../pinorpinor/src/app');
+
+    test('no website page silently resolves to a bogus profile', () {
+      if (!websiteApp.existsSync()) {
+        markTestSkipped(
+          'website checkout not present at ${websiteApp.path}; '
+          'deep-link coverage is unverified in this run',
+        );
+        return;
+      }
+
+      // Top-level route directories, which is what a shared link looks like.
+      final slugs = websiteApp
+          .listSync()
+          .whereType<Directory>()
+          .map((d) => d.path.split(RegExp(r'[\/]')).last)
+          .where((name) =>
+              !name.startsWith('[') &&
+              !name.startsWith('(') &&
+              !name.startsWith('_') &&
+              name != 'api' &&
+              name != 'admin')
+          .toList();
+
+      expect(slugs, isNotEmpty, reason: 'could not read the website pages');
+
+      final misrouted = <String>[];
+      for (final slug in slugs) {
+        final resolved = DeepLinks.resolve(
+          Uri.parse('https://pinorpinor.com/$slug'),
+        );
+        // Either the app claims it deliberately, or it declines it deliberately
+        // (null, meaning the link stays on the web). What must never happen is
+        // it resolving to a profile route for the slug itself.
+        if (resolved != null && resolved == AppRoutes.profileFor(slug)) {
+          misrouted.add(slug);
+        }
+      }
+
+      expect(
+        misrouted,
+        isEmpty,
+        reason:
+            'these website sections resolve to a profile lookup for a member '
+            'of the same name, so the link lands on "profile not found": '
+            '$misrouted. Add an explicit case in DeepLinks.resolve.',
+      );
+    });
+  });
+
+  group('the sections the app now owns', () {
+    test('opens Live, Videos and Locations in the app', () {
+      // All three returned null, or misrouted, before the app had screens.
+      expect(
+        DeepLinks.resolve(Uri.parse('https://pinorpinor.com/live')),
+        AppRoutes.live,
+      );
+      expect(
+        DeepLinks.resolve(Uri.parse('https://pinorpinor.com/videos')),
+        AppRoutes.videos,
+      );
+      expect(
+        DeepLinks.resolve(Uri.parse('https://pinorpinor.com/locations')),
+        AppRoutes.locations,
+      );
+    });
+
+    test('maps the website dashboard onto the app account hub', () {
+      // Different names for the same place.
+      expect(
+        DeepLinks.resolve(Uri.parse('https://pinorpinor.com/dashboard')),
+        AppRoutes.account,
+      );
+    });
+
+    test('still declines the sections the website has not built', () {
+      for (final slug in <String>['feeds', 'events', 'rooms', 'adverts']) {
+        expect(
+          DeepLinks.resolve(Uri.parse('https://pinorpinor.com/$slug')),
+          isNull,
+          reason: '$slug does not exist on the website either',
+        );
+      }
+    });
+
+    test('a real username still resolves to a profile', () {
+      // The default branch must keep working; the fix above must not have
+      // swallowed it.
+      expect(
+        DeepLinks.resolve(Uri.parse('https://pinorpinor.com/zainab_lagos')),
+        AppRoutes.profileFor('zainab_lagos'),
+      );
     });
   });
 }

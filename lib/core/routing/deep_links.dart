@@ -85,14 +85,56 @@ class DeepLinks {
       case 'signup':
         return AppRoutes.join;
 
-      // Marketing and legal pages have no app equivalent; they stay on the web.
-      case 'about':
-      case 'safety':
-      case 'privacy':
-      case 'terms':
-      case 'contact':
-      case 'locations':
+      case 'forgot-password':
+      case 'forgot_password':
+        return AppRoutes.forgotPassword;
+
+      // The website calls the member's own hub /dashboard; the app calls it
+      // /me. Without this a member tapping their own dashboard link fell
+      // through to the username branch below and got a profile lookup for
+      // somebody called "dashboard".
+      case 'dashboard':
+        return AppRoutes.account;
+
       case 'live':
+        return AppRoutes.live;
+
+      case 'videos':
+        return AppRoutes.videos;
+
+      case 'locations':
+        return AppRoutes.locations;
+
+      case 'favorites':
+      case 'saved':
+        return AppRoutes.favorites;
+
+      case 'matches':
+        return AppRoutes.matches;
+
+      // Sections the website itself has not built, plus its marketing and legal
+      // pages. These stay on the web.
+      //
+      // **Listing them explicitly is load-bearing**, not tidiness. Every one of
+      // these is a valid username shape (`^[a-z0-9_]{3,20}$`), so without a case
+      // here they fall through to the default branch and open a profile lookup
+      // for a member who does not exist — pinorpinor.com/faq would land on
+      // "profile not found". Any new website section needs adding here on the
+      // same day, and `deep_links_test.dart` fails if one is missed.
+      case 'about':
+      case 'adverts':
+      case 'events':
+      case 'exclusive':
+      case 'faq':
+      case 'feeds':
+      case 'maintenance':
+      case 'privacy':
+      case 'reviews':
+      case 'rooms':
+      case 'safety':
+      case 'contact':
+      case 'terms':
+      case 'testimonials':
         return null;
 
       default:
