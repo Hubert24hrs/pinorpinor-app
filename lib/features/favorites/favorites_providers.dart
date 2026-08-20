@@ -4,6 +4,7 @@ import '../../core/network/api_exception.dart';
 import '../../core/providers.dart';
 import '../../data/models/profile.dart';
 import '../../data/repositories/favorites_repository.dart';
+import '../auth/auth_controller.dart';
 
 /// The caller's shortlist.
 ///
@@ -63,7 +64,21 @@ final savedIdsProvider =
 
 class SavedIdsController extends Notifier<Set<String>> {
   @override
-  Set<String> build() => <String>{};
+  Set<String> build() {
+    // Rebuild — and therefore reset to empty — whenever the signed-in account
+    // changes, including on sign-out.
+    //
+    // This provider is deliberately not `autoDispose`, because a heart has to
+    // keep its state while the member moves between discovery, a profile and
+    // back. That longevity is exactly the hazard: without this watch the set
+    // outlives the session, so on a shared device the next person to sign in
+    // would open discovery and find the previous member's shortlist already
+    // hearted. A shortlist is private to its owner and the saved member is
+    // never told — leaking it to whoever picks up the phone next would defeat
+    // the point of the feature.
+    ref.watch(authControllerProvider.select((state) => state.session?.userId));
+    return <String>{};
+  }
 
   bool contains(String userId) => state.contains(userId);
 

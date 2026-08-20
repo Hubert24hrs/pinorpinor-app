@@ -107,13 +107,48 @@ Uploads are direct-to-storage, exactly as the website performs them:
    through the app server; the app holds no storage credential.
 3. `POST /api/upload/confirm` — the server re-checks the key belongs to the
    caller and that an object exists there, then writes the row with
-   `isApproved: false`.
+   `isApproved: true`.
 
-Every upload is **held until a moderator releases it**. The owner sees their own
-pending media marked "Awaiting review"; nobody else sees it at all.
+**Uploads publish immediately, and moderation is reactive.** This reversed on
+2026-08-14: media used to be held until a moderator released it, and now it is
+publicly visible the instant the transfer finishes. The admin queue can still
+take an item down, which deletes the object from the bucket rather than merely
+hiding the row.
+
+So `isApproved: false` now means **taken down**, not *queued* — and no screen in
+the app says "awaiting review", because nothing is. It is also an open App Store
+guideline 1.2 gap; see `docs/STORE_READINESS.md`.
 
 Reads use short-lived signed URLs (one hour) embedded in the API's JSON, or the
 stable `/api/media/<id>` proxy where a URL must outlive a signature.
+
+---
+
+### The web build is a layout scaffold, not a supported target
+
+`flutter build web` works and `web/` is checked in, but **the app cannot
+function in a browser** and is not shipped there. Two reasons, both structural:
+
+- **CORS.** The website sends no `Access-Control-*` headers at all — verified by
+  grepping its source, not assumed — so a page served from `localhost` is
+  blocked on every API call.
+- **The session cookie.** Auth depends on an `HttpOnly` NextAuth cookie attached
+  by hand in `ApiClient`. A browser will neither expose it to JavaScript nor
+  send it cross-site, so no signed-in flow can work regardless of CORS.
+
+What the web build *is* good for is looking at the UI quickly without a device:
+layout at various widths, navigation, the 18+ gate, form validation and the
+services selector are all real. Everything network-shaped renders its error or
+empty state.
+
+```bash
+flutter build web --no-tree-shake-icons
+python -m http.server 8765 --directory build/web
+```
+
+Do not add web to the release pipeline, and do not "fix" the CORS failure by
+asking the website to open its origin — that would weaken a real boundary for a
+target nobody ships.
 
 ---
 
@@ -253,12 +288,12 @@ flutter test               # unit + widget
 flutter test integration_test/app_flow_test.dart   # needs a device/emulator
 ```
 
-Current state: **218 tests, all passing; analyzer clean; debug APK builds.**
+Current state: **222 tests, all passing; analyzer clean; debug APK builds.**
 
 | Gate | Result |
 | --- | --- |
 | `flutter analyze` | No issues found |
-| `flutter test` | 218 passing |
+| `flutter test` | 222 passing |
 | `dart format .` | Clean |
 | `flutter build apk --debug` | `app-debug.apk` produced (116.1 MB, arm64) |
 | `flutter build appbundle --release` | Not run — needs the owner's `key.properties` |

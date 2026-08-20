@@ -90,7 +90,7 @@ API route handlers, 27 Prisma models — not from a summary.
 | MIME allow-list | Mirrored client-side, authoritative server-side | COMPLETE | — | |
 | Upload progress | Real byte progress from the PUT | COMPLETE | — | The website only fakes progress in three steps; the app reports actual bytes |
 | Delete media | `DELETE /api/upload/delete` with confirmation | COMPLETE | NOT VERIFIED | |
-| Held-for-moderation state | "Awaiting review" overlay on the owner's own pending media | COMPLETE | VERIFIED | `models_test` asserts `hasPendingMedia` and that no pending photo becomes an avatar |
+| Taken-down state | "Removed" overlay on the owner's own unapproved media | COMPLETE | VERIFIED | `models_test` asserts `hasPendingMedia` and that no unapproved photo becomes an avatar. The overlay used to read "Awaiting review"; since 2026-08-14 uploads publish on arrival, so `isApproved: false` means a moderator removed it |
 | Signed read URLs | Handled transparently; cache keyed on path, not signature | COMPLETE | — | |
 | Camera capture | Offered alongside gallery | COMPLETE | NOT VERIFIED | The website has no camera path at all — a mobile addition |
 | Image compression | 1080px floor, quality 82, EXIF stripped | COMPLETE | — | Mobile addition; also removes GPS from photos |
@@ -246,6 +246,36 @@ handover.
 contracts as read from the website source. Creating real accounts, reports or
 contact requests against a production platform with real members would have been
 the wrong thing to do.
+
+---
+
+## Route coverage — measured, not estimated
+
+Every `route.ts` under the website's `src/app/api` was enumerated and diffed
+against every `/api/...` literal in `lib/`. This is a mechanical check, so it
+cannot miss a route the way reading down a feature list can.
+
+| | Count |
+| --- | --- |
+| Website API routes | **59** |
+| Admin-only (`/api/admin/*`) — correctly absent from a consumer app | 11 |
+| Scheduler-only (`/api/cron/expire-boosts`) — **must** stay absent | 1 |
+| Remaining member-facing routes | **47** |
+| Of those, called by the app | **47 — all of them** |
+
+The cron route is not an oversight and must never gain a caller: it is
+authenticated with `CRON_SECRET` compared in constant time, so shipping a
+client for it would mean shipping that secret inside the binary, where anyone
+can read it. Vercel Cron calls it; nothing else may.
+
+The admin routes are excluded for the same reason they are excluded from the
+website's own member UI — they are moderation and finance tooling behind
+`requireAdmin`, and an app that carried them would be an app whose compromise
+carried them too.
+
+**So there is no member-facing endpoint the website exposes and the app does not
+call.** What follows records how each area is implemented and where behaviour
+deliberately differs.
 
 ---
 
