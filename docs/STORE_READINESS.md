@@ -43,14 +43,20 @@ repository.
 
 ## Account deletion — required by both stores
 
+This got materially stronger on 2026-08-20. The app used to offer only
+deactivation while calling it deletion, and pointed at support for real
+erasure — which met the letter of the requirement at best. `DELETE /api/account`
+now exists, so the app does the real thing.
+
 | Requirement | How it is met | Status |
 | --- | --- | --- |
-| Reachable in-app | Settings → Account and deletion → Delete my account | DONE |
-| Confirmation before destruction | Type-your-username dialog | DONE |
-| Honest about scope | Copy says the account is closed and the profile removed, and that some records are retained | DONE |
-| Route to full erasure | "Request full data erasure" link to support | DONE |
+| Reachable in-app | Settings → Account → Delete my account permanently | DONE |
+| Actually deletes | `DELETE /api/account` removes every bucket object, **then** the rows. Cascades take the profile, media, settings, wallet, ledger, favourites, blocks, contact requests, swipes, matches and sessions | DONE |
+| Confirmation before destruction | Two gates: type the username, and enter the account password. The server re-checks the password with bcrypt | DONE |
+| Reversible alternative offered | Deactivate sits above it, separately labelled, so someone taking a break does not destroy their account by mistake | DONE |
+| Honest about scope | Copy names what is erased and what is retained (safety reports, financial records, audit entries) rather than implying total erasure | DONE |
 | Web URL for the Play form | `https://pinorpinor.com/contact` | OWNER |
-| Operator erasure procedure | Documented step by step in `SECURITY.md` § 14 | DONE |
+| Retention rationale | `SECURITY.md` § 14 | DONE |
 
 ## Permissions
 
@@ -98,15 +104,45 @@ three deep-link entries (`pinorpinor://`, `pinorpinor.com`,
 
 ## User-generated content — App Store guideline 1.2
 
-This is the guideline most likely to be applied to a dating app. All four
-requirements are met:
+This is the guideline most likely to be applied to a dating app, and **one of
+its four requirements is no longer met.** Read this section before submitting.
 
-| Requirement | Implementation |
-| --- | --- |
-| A method for filtering objectionable material | Every photo and video is held (`isApproved: false`) until a human moderator releases it through the website's admin queue |
-| A mechanism to report offensive content, with timely responses | Report control on every profile and conversation; seven structured reasons including "This person appears to be under 18"; reports land in the moderation queue |
-| The ability to block abusive users | Block on every profile and conversation; hides both members from each other in both directions and ends any existing match in the same server-side transaction |
-| Published contact information | `https://pinorpinor.com/contact`, linked in Settings |
+| Requirement | Implementation | Status |
+| --- | --- | --- |
+| A method for filtering objectionable material **from being posted** | Uploads publish immediately. The admin Media Queue lists everything after the fact, and rejecting an item deletes the object from the bucket | ⚠️ **Reactive only** |
+| A mechanism to report offensive content, with timely responses | Report control on every profile and conversation; seven structured reasons including "This person appears to be under 18"; reports land in the moderation queue | Met |
+| The ability to block abusive users | Block on every profile and conversation; hides both members from each other in both directions and ends any existing match in the same server-side transaction | Met |
+| Published contact information | `https://pinorpinor.com/contact`, linked in Settings | Met |
+
+### The gap, stated plainly
+
+Guideline 1.2 asks for a method for filtering objectionable material **from
+being posted**. Until 2026-08-14 the platform had exactly that: every upload was
+held at `isApproved: false` until a human released it. Migration
+`20260814000000_emailless_signup` reversed the default, and
+`/api/upload/confirm` was changed to match, so media is now publicly visible the
+instant the transfer finishes.
+
+That was the owner's decision, taken with the risk written down, and it is not
+the app's to reverse. But it changes what can honestly be claimed in a review
+submission, and a claim of pre-publication moderation would now be false. On a
+platform carrying personal adult imagery, a reviewer who uploads a test image
+and sees it appear immediately will draw their own conclusion.
+
+**This is the single most likely cause of a store rejection**, ahead of anything
+in the app itself. Closing it needs a backend change, and there are two credible
+shapes:
+
+1. **Restore the hold for first-time uploaders only.** New accounts queue;
+   established, previously-reviewed members publish immediately. Keeps the
+   platform's momentum while putting a human in front of the highest-risk
+   uploads.
+2. **Automated pre-screening.** A CSAM/nudity classifier in front of
+   `/api/upload/confirm`, holding only what it flags.
+
+Either satisfies the guideline. Neither is client work, and neither can be
+faked from the app. What the app *does* do is refuse to misrepresent the
+situation: no screen says "awaiting review", because nothing is.
 
 ## Payments — why there is no in-app purchase
 
