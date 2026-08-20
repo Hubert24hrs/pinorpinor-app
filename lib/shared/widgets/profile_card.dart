@@ -97,6 +97,8 @@ class _ProfileCardState extends State<ProfileCard> {
                           spacing: 4,
                           runSpacing: 4,
                           children: <Widget>[
+                            if (profile.presence.isOnlineNow)
+                              const AppBadge.onlineNow(dense: true),
                             if (profile.isRedHot)
                               const AppBadge.boosted(dense: true),
                             if (profile.isFeatured && !profile.isRedHot)

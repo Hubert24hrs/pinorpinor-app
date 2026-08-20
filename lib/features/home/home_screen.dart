@@ -517,8 +517,8 @@ class _SafetyCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Photos and videos are reviewed by a moderator before they '
-                  'appear. A member\'s phone number is never published — you '
+                  'Our moderators review photos and videos, and remove '
+                  'anything that breaks the rules. A member\'s phone number is never published — you '
                   'ask, and they decide. You can block or report anyone at any '
                   'time.',
                   style: Theme.of(context).textTheme.bodySmall,

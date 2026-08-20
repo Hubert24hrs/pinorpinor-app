@@ -121,11 +121,17 @@ class ProfileSummary {
     return null;
   }
 
-  /// "Lagos, Nigeria" where both are known, falling back to whichever exists.
+  /// "Ikeja, Lagos, Nigeria" where all are known, falling back to whichever
+  /// parts exist.
+  ///
+  /// `location` is the backend's own pre-composed string and wins when present:
+  /// it is rebuilt server-side on every city or state change, so preferring the
+  /// parts would risk showing a stale combination.
   String? get placeLabel {
     if (location != null && location!.isNotEmpty) return location;
     final parts = <String>[
       if (city != null && city!.isNotEmpty) city!,
+      if (state != null && state!.isNotEmpty) state!,
       if (country != null && country!.isNotEmpty) country!,
     ];
     return parts.isEmpty ? null : parts.join(', ');
@@ -223,11 +229,15 @@ class ProfilePage {
   factory ProfilePage.fromJson(Map<String, dynamic> json) {
     final pagination = asMap(json['pagination']);
     final scope = asMap(json['scope']);
-    // `/api/ladies` calls the collection `ladies`; `/api/public/profiles` calls
-    // it `profiles`. Both are read so one page type covers each surface.
+    // Three endpoints, three names for the same collection: `/api/ladies`
+    // calls it `ladies`, `/api/public/profiles` calls it `profiles`, and
+    // `/api/public/online` calls it `members`. All are read so one page type
+    // covers every surface.
     final rows = json.containsKey('profiles')
         ? json['profiles']
-        : json['ladies'];
+        : json.containsKey('ladies')
+        ? json['ladies']
+        : json['members'];
 
     return ProfilePage(
       profiles: ProfileSummary.listFrom(rows),

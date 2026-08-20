@@ -5,7 +5,7 @@
 > codebase. Trust the source over this file where they disagree, and update this
 > file when they do.
 
-Last verified: **2026-08-14**. Analyzer clean, **167 tests passing**, debug APK
+Last verified: **2026-08-20**. Analyzer clean, **218 tests passing**, debug APK
 builds. Local: `C:\Users\HP\.gemini\antigravity-ide\scratch\pinorpinor-app`.
 Repository: `https://github.com/Hubert24hrs/pinorpinor-app`, branch `main`.
 
@@ -13,19 +13,49 @@ Repository: `https://github.com/Hubert24hrs/pinorpinor-app`, branch `main`.
 
 Everything is committed and pushed; the working tree is clean.
 
-**The app has now reached a real phone once, and it crashed on launch.**
-`MainActivity.kt` still declared the pre-rename package, so the manifest's
-relative `.MainActivity` resolved to a class that did not exist. Fixed, verified
-at the bytecode level — the correct class is in `classes15.dex` of the APK and
-no copy of the old one survives anywhere in `build/` — and guarded by
-`test/unit/android_manifest_test.dart`. See "The trap that actually shipped".
+**The website changed underneath the app on 2026-08-14, and both halves of
+account access were broken.** Neither break produced a compile error, a failing
+test, or a bad build. Both are now fixed; this is the thing to understand before
+touching auth again.
 
-A corrected APK is with the owner. **Whether it now launches is not yet known.**
-That is the single most valuable outstanding answer in the project: it is the
-difference between "one crash, found and fixed" and "the first screen has still
-never rendered on hardware".
+1. **Sign-in.** `authorize()` in the website's `src/lib/auth.ts` now reads
+   `credentials.identifier` and chooses the column by whether the value contains
+   an `@`. The app was posting `email`, so `identifier` arrived undefined,
+   `authorize()` returned null on its first guard, and **every sign-in answered
+   401** — which is exactly what a wrong password looks like. No signed-in flow
+   in this app could ever have worked against the current backend.
 
-If it still fails, get a crash log rather than guessing:
+2. **Registration.** `/api/member/join` was rebuilt down to six fields:
+   `username`, `password`, `phone`, `bio`, `services`, `isAdult`. The app was
+   still sending `email`, `displayName`, `birthDate`, `gender` and `countryCode`
+   as required — none of which is read any more — and was never sending
+   `isAdult`, which the route rejects outright.
+
+The lesson generalises, and it is the reason `test/unit/services_catalogue_test.dart`
+exists: **a client and a server can agree at compile time and disagree at run
+time, and only a device tells you.** Where a contract can be read off the
+website's source, read it off the website's source.
+
+### What else moved on the website, and is now mirrored
+
+| Change | Migration / commit | What the app does now |
+| --- | --- | --- |
+| Email is optional; login is by username | `20260814000000_emailless_signup` | Sign-in field is "Username or email"; join collects no address and **warns that a forgotten password cannot be recovered** |
+| Media publishes on upload | same migration | Every "awaiting review" string is gone. `isApproved: false` now means *taken down*, not *queued* |
+| Services catalogue | `20260813010000_profile_services` | `lib/core/constants/services.dart`, **generated** from `src/lib/services.ts` |
+| Rates in minor units | `20260814010000_rates_location_views` | `lib/core/utils/money.dart` + `MemberRates` |
+| `state`, `build`, `languages` | same | On `ProfileSummary` and the detail screen |
+| Presence buckets | `users.lastSeenAt` + `src/lib/presence.ts` | `Presence` enum; "Online now" badge only |
+| Favourites | `/api/favorites` | `FavoritesRepository`, `/favorites` screen, heart on profiles |
+| Online feed | `/api/public/online` | `DiscoveryRepository.online()` |
+| Permanent deletion | `/api/account` | Settings offers deactivate *and* delete, the latter password-confirmed |
+| Date proposals | `/api/dates` | `DatesRepository` |
+
+**Pick up here:** the device-test checklist under "Next steps". Launch on real
+hardware is *still* unconfirmed — see "Verification status", which is honest
+about what that means.
+
+If the APK does not open, get a crash log rather than guessing:
 
 ```
 adb uninstall com.pinorpinor.app.debug   # a stale install looks identical to a broken build
@@ -41,9 +71,28 @@ kept timing out on this machine. That covers essentially every phone from 2016
 onward; `INSTALL_FAILED_NO_MATCHING_ABIS` means the fix is a universal build,
 not a code change.
 
-**Pick up here:** confirm launch, then the device-test checklist under "Next
-steps". Everything in the "Verification status" table collapses from
-*unverified* to *known* the moment that walk-through happens.
+---
+
+## The catalogue is generated, not hand-maintained
+
+`lib/core/constants/services.dart` mirrors the website's `src/lib/services.ts`.
+Do not edit it by hand. Drift between the two is silent and asymmetric:
+
+- an id the app knows and the server does not is **dropped by
+  `sanitizeServiceIds` on save**, so a member's selection vanishes with no
+  error;
+- an id the server knows and the app does not **renders as a raw slug**
+  ("gfe") on a public profile.
+
+`test/unit/services_catalogue_test.dart` reads the real TypeScript and fails on
+either. It has already caught one live divergence: the catalogue was reworked
+from an explicit list to a companionship one on 2026-08-20, and the test failed
+within the same session that generated the file.
+
+Regenerate rather than retype. The 35 pre-2026-08-20 ids are still present as
+`retired: true` in the `archived` group — that is the website's own
+retire-don't-delete rule, and it is why a profile written before the change
+still renders a label instead of a slug.
 
 ---
 
@@ -151,13 +200,21 @@ answer without a round trip; it is never the thing enforcing them.
 
 | Rule | Where it really lives |
 | --- | --- |
-| 18+ only | `/api/member/join` validates `birthDate` server-side |
-| Women list publicly, featured 24h; men's profiles are `isPublic: false` and never listed | `/api/member/join` |
+| 18+ is an assertion, not a date | `/api/member/join` requires `isAdult === true`. `birthDate` stays **null** for every account created since 2026-08-14, so nothing downstream may assume an age exists |
+| Registration creates women only | `/api/member/join` forces `gender: WOMAN`. It is not a general signup route |
+| The country comes from the phone number | `countryFromPhone`. A number that does not resolve leaves `countryCode` null — and discovery scopes on it, so the member is listed nowhere |
+| Login accepts a username **or** an email | `authorize()` splits on the presence of an `@` |
 | Anonymous callers only ever see women | `resolveVisibleGenders()` — hard-limited, ignores client input |
 | Only lady accounts may upload media | `/api/upload/presigned-url` returns 403 otherwise |
 | Discovery never crosses borders | `resolveViewerCountry` pins a signed-in member |
-| All media held for moderation (`isApproved: false`) | Only `/api/admin/media` can release it |
+| **Media publishes on upload** | `isApproved: true` on insert since 2026-08-14. Moderation is reactive: rejecting deletes the object from the bucket |
+| Media needs `isApproved` **and** `isPublic` | The first is the moderator's decision, the second the owner's. Both must hold |
+| Services are ids from a fixed catalogue | `sanitizeServiceIds` drops anything else. Never free text |
+| Rates are integers in minor units | And minor units are not always hundredths — see `lib/core/utils/money.dart` |
+| Last-active is a coarse bucket, never a timestamp | `src/lib/presence.ts`. A precise time is a movement log |
+| Favourites are private and one-directional | `/api/favorites`. The saved member is never told, and no endpoint would tell them |
 | Phone numbers never published; WhatsApp needs an ACCEPTED `ContactRequest` | `/api/profile/[u]/whatsapp` |
+| Deleting an account erases bucket objects **before** rows | `/api/account`. The other order strands every photo |
 | Credits sold over WhatsApp; card payment off (`503`) | `PAYSTACK_ENABLED=false` |
 
 **`ProfilePage.pinned`** is what tells the UI whether to offer a country picker.
@@ -187,9 +244,22 @@ reading the reason.
   cert rotation; the realistic failure is a bricked app in members' hands.
 - **No dark mode.** The website ships one light identity with no switcher. The
   theming is structured to accept one later.
-*(The swipe deck was the fourth entry here until 2026-08-14. It now exists —
+*(The swipe deck was an entry here until 2026-08-14. It now exists —
 `features/discovery/swipe_screen.dart` — and is the app's only surface for
-`/api/swipe`, which the website still does not expose.)*
+`/api/swipe`, which the website still does not expose. Favourites, the online
+feed and date proposals joined it on 2026-08-20.)*
+
+**Also deliberately absent: a media visibility toggle.** `media.isPublic` is a
+real column and the owner is meant to control it, but no client endpoint sets
+it — only admin paths do. The app reads it and does not offer a switch, because
+a control that silently fails is worse than no control. If the website adds
+`PATCH /api/media/[id]`, this becomes a ten-line change.
+
+**And no "who saved me".** The backend has no endpoint for it, by design.
+Favourites are one-directional and the saved member is never told; being able
+to see who has bookmarked you would make the feature a surveillance signal on a
+platform where women are browsed by strangers. Do not add it client-side by
+diffing lists.
 
 ---
 
@@ -218,7 +288,7 @@ licences included), not fetched at runtime.
 
 ```bash
 flutter analyze     # expect: No issues found
-flutter test        # expect: 167 passing
+flutter test        # expect: 218 passing
 flutter build apk --debug
 ```
 
@@ -242,7 +312,7 @@ reports on a live platform with real members would be worse than none.
 | Area | Status |
 | --- | --- |
 | `flutter analyze` | Clean |
-| `flutter test` | 167 passing |
+| `flutter test` | 218 passing |
 | Debug APK | Builds (116.1 MB, arm64, 49.7s incremental) |
 | Release `.aab` | **Not run** — needs the owner's `android/key.properties` |
 | iOS build | **Blocked** — needs macOS + Xcode |
@@ -250,6 +320,10 @@ reports on a live platform with real members would be worse than none.
 | On device — launch | **One crash found and fixed** (wrong `MainActivity` package). The corrected build has **not yet been confirmed to launch** |
 | Emulator | **Unavailable.** The machine's only AVD cannot start: `x86_64 emulation currently requires hardware acceleration` — the hypervisor driver is not installed |
 | Signed-in API flows | **Not verified against a live account.** Written against contracts read from the website source |
+| Sign-in field name | **Fixed, not verified.** The `identifier` contract was read from `src/lib/auth.ts`. It has not been exercised against a live account |
+| Six-field registration | **Fixed, not verified.** Same: read from the route, never run |
+| Services catalogue parity | **Verified by test**, against the local website checkout |
+| Minor-unit money maths | **Verified by test**, including the zero-decimal currencies |
 
 Untested as a result: camera capture, a real upload over mobile data, video
 playback, the WhatsApp handoff, deep-link intent resolution, notification
@@ -257,6 +331,12 @@ permission prompts. Named in `docs/STORE_READINESS.md`.
 
 **Do not claim any of these work.** The public endpoints *were* exercised
 against production; the 401-on-bad-credential shape was confirmed there.
+
+A specific caution about the two contract fixes. They were derived by reading
+the website's source, which is the best available evidence and is *not* the
+same as a successful round trip. The previous versions were also derived that
+way, and were correct when written. **The first signed-in flow on a real device
+is what turns these from "should work" into "works".**
 
 ---
 

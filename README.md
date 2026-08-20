@@ -2,14 +2,22 @@
 
 The official Flutter client for [Pinorpinor](https://pinorpinor.com), a premium
 social discovery and meetup platform focused on Nigeria. Adult women (18+)
-create public profiles with photos, short videos, interests and preferred date
-activities. Visitors browse those profiles without logging in; contacting a
-member requires an account **and that member's explicit consent**.
+create public profiles with photos, short videos, the services they offer and
+the rates they charge. Visitors browse those profiles without logging in;
+contacting a member requires an account **and that member's explicit consent**.
 
 This app is the native counterpart of the existing website, not a second
 product. It talks to the same backend, the same database and the same accounts:
 somebody who signs up in the app is the same member somebody else sees on the
 website, immediately.
+
+> **The backend is Supabase — reached through the website's REST API, not
+> directly.** The app holds no key of any kind. This is not an oversight and
+> must not be "fixed": migration `20260812030000_lock_down_postgrest` revokes
+> every `anon` and `authenticated` grant on schema `public` and enables RLS on
+> every table with **no policies**, so a `supabase_flutter` client would receive
+> `401 permission denied` on every query. See
+> [How the app talks to the backend](#how-the-app-talks-to-the-backend).
 
 ---
 
@@ -245,12 +253,12 @@ flutter test               # unit + widget
 flutter test integration_test/app_flow_test.dart   # needs a device/emulator
 ```
 
-Current state: **167 tests, all passing; analyzer clean; debug APK builds.**
+Current state: **218 tests, all passing; analyzer clean; debug APK builds.**
 
 | Gate | Result |
 | --- | --- |
 | `flutter analyze` | No issues found |
-| `flutter test` | 167 passing |
+| `flutter test` | 218 passing |
 | `dart format .` | Clean |
 | `flutter build apk --debug` | `app-debug.apk` produced (116.1 MB, arm64) |
 | `flutter build appbundle --release` | Not run — needs the owner's `key.properties` |
@@ -258,13 +266,26 @@ Current state: **167 tests, all passing; analyzer clean; debug APK builds.**
 | Suite | Covers |
 | --- | --- |
 | `test/unit/validators_test.dart` | username rules, email, password floor, the 18+ age gate, E.164 phone, message length |
-| `test/unit/models_test.dart` | every response shape the API returns, including the two that differ between routes, and malformed payloads |
+| `test/unit/auth_contract_test.dart` | the sign-in identifier rule (username **or** email, split on the `@`), and the registration constraints the route enforces |
+| `test/unit/services_catalogue_test.dart` | **reads the website's real `services.ts`** and fails if the app's catalogue has drifted from it |
+| `test/unit/money_test.dart` | minor-unit arithmetic, including the zero-decimal currencies (JPY, KRW, VND, RWF, XOF/XAF) where dividing by 100 is the bug |
+| `test/unit/presence_test.dart` | the four activity buckets, and that an unknown value degrades to the least revealing one |
+| `test/unit/favorites_test.dart` | shortlist parsing, and that `savedAt` stays off the shared profile model |
+| `test/unit/models_test.dart` | every response shape the API returns, including the three that differ between routes, and malformed payloads |
 | `test/unit/deep_links_test.dart` | which links the app claims, and that it never resolves one outside its own route table |
 | `test/unit/api_client_test.dart` | cookie storage, cookie attachment, `Set-Cookie` harvesting, session teardown on 401/suspension, status→error mapping |
+| `test/unit/android_manifest_test.dart` | the Android wiring that only a device disagrees with — see "The trap that actually shipped" in `CLAUDE.md` |
 | `test/widget/profile_card_test.dart` | badges, verified tick, semantics, overflow at 320px |
-| `test/widget/login_screen_test.dart` | validation before request, email folding, error surfacing, layout at 320px and iPad |
-| `test/widget/join_screen_test.dart` | the age gate, gender-conditional copy, country default |
+| `test/widget/login_screen_test.dart` | validation before request, identifier folding, error surfacing, layout at 320px and iPad |
+| `test/widget/join_screen_test.dart` | the six-field flow, the unrecoverable-password warning, the 18+ gate, E.164 enforcement |
 | `test/widget/report_block_test.dart` | both safety controls, confirmation copy, signed-out handling |
+
+Two of these guard a class of bug the rest cannot reach. `services_catalogue_test.dart`
+and `auth_contract_test.dart` exist because on 2026-08-14 the website changed
+two contracts, the app kept sending the old shapes, and **every gate stayed
+green**: the analyzer, the whole suite, and the APK build. A fake repository has
+whatever signature the real one has, so a widget test cannot notice. Where a
+contract can be read off the website's source, read it off the website's source.
 
 The integration test drives the real app widget with a scripted backend. It
 deliberately does not hit production — a suite that created real accounts and

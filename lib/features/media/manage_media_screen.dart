@@ -25,11 +25,13 @@ import 'media_viewer.dart';
 ///   * **Only lady accounts can upload.** `/api/upload/presigned-url` returns
 ///     403 for anyone else, so this screen shows an explanation rather than
 ///     controls that would fail.
-///   * **Every upload is held for moderation.** `isApproved` defaults to false
-///     and only the admin queue can flip it. The owner sees their own pending
-///     media flagged "Awaiting review" — hiding it would make a photo appear to
-///     vanish seconds after uploading, which reads as a bug rather than as the
-///     review the product promises.
+///   * **Uploads publish immediately.** Since 2026-08-14 `isApproved` is true
+///     on insert, so a photo is visible to everyone the moment it finishes
+///     transferring. Moderation happens afterwards: the admin queue can take an
+///     item down, which deletes the object from the bucket rather than merely
+///     hiding the row. The screen says so plainly — telling a member their
+///     photo is "awaiting review" when it is already public would be a
+///     materially false statement about who can see their body.
 class ManageMediaScreen extends ConsumerStatefulWidget {
   const ManageMediaScreen({super.key});
 
@@ -100,7 +102,7 @@ class _ManageMediaScreenState extends ConsumerState<ManageMediaScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Uploaded. A moderator will review it shortly.'),
+          content: Text('Uploaded. It is live on your profile now.'),
         ),
       );
     } on ApiException catch (error) {
@@ -209,9 +211,10 @@ class _ManageMediaScreenState extends ConsumerState<ManageMediaScreen> {
 
           const InlineNotice.info(
             message:
-                'Every photo and video is checked by a moderator before '
-                'other members can see it. Yours stay visible to you in the '
-                'meantime, marked "Awaiting review".',
+                'Photos and videos go live as soon as they finish uploading, '
+                'so other members can see them straight away. Our moderators '
+                'review afterwards and remove anything that breaks the rules. '
+                'You can delete yours at any time.',
           ),
           const SizedBox(height: AppSpacing.xl),
 
@@ -376,6 +379,9 @@ class _MediaTile extends StatelessWidget {
                 ),
         ),
 
+        // `isApproved` no longer means "not yet released" — uploads insert as
+        // true. It goes false only when a moderator takes an item down, so this
+        // badge marks a removal rather than a queue position.
         if (!item.isApproved)
           Positioned(
             left: 4,
@@ -388,7 +394,7 @@ class _MediaTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: const Text(
-                'Awaiting review',
+                'Removed',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: AppTheme.sansFamily,

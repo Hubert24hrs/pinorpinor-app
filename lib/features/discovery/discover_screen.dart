@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/countries.dart';
 import '../../core/routing/app_routes.dart';
+import '../../core/constants/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
@@ -404,6 +405,8 @@ class _FilterSheetState extends State<_FilterSheet> {
   late bool _availableOnly;
   late String? _countryCode;
   late final TextEditingController _cityController;
+  late final Set<String> _services;
+  late ActivityFilter _activity;
 
   @override
   void initState() {
@@ -416,6 +419,8 @@ class _FilterSheetState extends State<_FilterSheet> {
     _availableOnly = widget.initial.availableTodayOnly;
     _countryCode = widget.initial.countryCode;
     _cityController = TextEditingController(text: widget.initial.city ?? '');
+    _services = widget.initial.services.toSet();
+    _activity = widget.initial.activity;
   }
 
   @override
@@ -521,6 +526,61 @@ class _FilterSheetState extends State<_FilterSheet> {
               ),
 
               const SizedBox(height: AppSpacing.lg),
+              Text('Last active', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.sm,
+                children: <Widget>[
+                  for (final option in ActivityFilter.values)
+                    ChoiceChip(
+                      label: Text(option.label),
+                      selected: _activity == option,
+                      onSelected: (_) => setState(() => _activity = option),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: AppSpacing.lg),
+              Text('Services', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                // Overlap, not containment — worth saying, because "select
+                // three" reading as "must offer all three" would look like the
+                // filter is broken when it returns more than expected.
+                'Shows members offering any of these.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              for (final group in servicesByGroup()) ...<Widget>[
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.sm),
+                  child: Text(
+                    group.group.label,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: <Widget>[
+                    for (final option in group.options)
+                      FilterChip(
+                        label: Text(option.label),
+                        selected: _services.contains(option.id),
+                        onSelected: (selected) => setState(() {
+                          if (selected) {
+                            _services.add(option.id);
+                          } else {
+                            _services.remove(option.id);
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: AppSpacing.lg),
               Row(
                 children: <Widget>[
                   Expanded(
@@ -543,6 +603,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                             ageMax: _ageRange.end.round(),
                             verifiedOnly: _verifiedOnly,
                             availableTodayOnly: _availableOnly,
+                            services: _services.toList(),
+                            activity: _activity,
                           ),
                         );
                       },

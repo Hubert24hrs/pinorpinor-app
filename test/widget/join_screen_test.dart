@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pinorpinor_app/core/constants/services.dart';
 import 'package:pinorpinor_app/features/auth/join_screen.dart';
 import 'package:pinorpinor_app/shared/widgets/brand.dart';
 
@@ -27,6 +28,11 @@ void main() {
       stubRoutes: const <String>['/home', '/verify', '/login'],
     );
   }
+
+  // Derived from the catalogue rather than hardcoded. The catalogue is
+  // generated from the website and was reworked once mid-development; a test
+  // naming a literal label breaks on a rewording that is not a defect.
+  final firstService = kServices.firstWhere((s) => !s.retired);
 
   /// Fills step one and advances to the WhatsApp/bio step.
   Future<void> completeAccountStep(WidgetTester tester) async {
@@ -184,7 +190,7 @@ void main() {
     );
 
     // Selecting a service alone is still not enough.
-    final chip = find.widgetWithText(FilterChip, 'Dinner Dates');
+    final chip = find.widgetWithText(FilterChip, firstService.label);
     await tester.ensureVisible(chip);
     await tester.pumpAndSettle();
     await tester.tap(chip);
@@ -217,7 +223,7 @@ void main() {
     await tester.tap(continueButton.first);
     await tester.pumpAndSettle();
 
-    final chip = find.widgetWithText(FilterChip, 'Dinner Dates');
+    final chip = find.widgetWithText(FilterChip, firstService.label);
     await tester.ensureVisible(chip);
     await tester.pumpAndSettle();
     await tester.tap(chip);
@@ -240,7 +246,7 @@ void main() {
     expect(call['username'], 'zainab_lagos');
     expect(call['phone'], '+2348012345678');
     expect(call['bio'], 'Jollof and jazz.');
-    expect(call['services'], <String>['dinner_dates']);
+    expect(call['services'], <String>[firstService.id]);
     expect(call['isAdult'], isTrue);
   });
 

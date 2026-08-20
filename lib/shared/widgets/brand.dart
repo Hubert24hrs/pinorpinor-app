@@ -242,6 +242,16 @@ class AppBadge extends StatelessWidget {
       border = AppColors.badgeGoldBorder,
       icon = Icons.auto_awesome_rounded;
 
+  /// "Online now" only. The other presence buckets deliberately have no badge:
+  /// a dot for "active this week" makes an absent member look present, which is
+  /// the misreading the coarse buckets exist to prevent.
+  const AppBadge.onlineNow({super.key, this.dense = false})
+    : label = 'Online now',
+      background = AppColors.badgeVerifiedBg,
+      foreground = AppColors.badgeVerifiedFg,
+      border = AppColors.badgeVerifiedBorder,
+      icon = Icons.circle;
+
   const AppBadge.location({super.key, required this.label, this.dense = false})
     : background = AppColors.badgeLocationBg,
       foreground = AppColors.badgeLocationFg,

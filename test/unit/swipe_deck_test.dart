@@ -75,7 +75,7 @@ Future<(ProviderContainer, SwipeDeckController)> _boot(
   addTearDown(container.dispose);
 
   // The deck is autoDispose. A bare `read` would create it and tear it down in
-  // the same turn, leaving the controller unmounted so no state ever lands â€”
+  // the same turn, leaving the controller unmounted so no state ever lands —
   // which is exactly what the widget tree avoids by watching it. Hold a
   // subscription for the life of the test to reproduce that.
   final subscription = container.listen<SwipeDeckState>(
@@ -231,7 +231,7 @@ void main() {
   group('failure handling', () {
     test('a network failure puts the card back at the front', () async {
       // The important one. If a failed swipe were dropped, the member would
-      // believe they had passed on someone the server never recorded â€” and
+      // believe they had passed on someone the server never recorded — and
       // would then see them again, with no explanation.
       final discovery = _FakeDiscovery(
         pages: <List<ProfileSummary>>[
@@ -253,7 +253,7 @@ void main() {
     });
 
     test(
-      'a 403 keeps the card gone â€” retrying would fail identically',
+      'a 403 keeps the card gone — retrying would fail identically',
       () async {
         final discovery = _FakeDiscovery(
           pages: <List<ProfileSummary>>[

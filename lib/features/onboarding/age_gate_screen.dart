@@ -133,11 +133,16 @@ class AgeGateScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpacing.xl),
 
+                        // Deliberately does not promise pre-publication
+                        // review. Uploads publish immediately as of
+                        // 2026-08-14, so claiming otherwise on the notice that
+                        // gates entry to the whole app would be the worst
+                        // possible place to be wrong.
                         const _Assurance(
                           icon: Icons.verified_user_outlined,
                           text:
-                              'Every photo and video is reviewed by a moderator '
-                              'before anyone else can see it.',
+                              'Our moderators review member photos and videos, '
+                              'and remove anything that breaks the rules.',
                         ),
                         const _Assurance(
                           icon: Icons.lock_outline_rounded,

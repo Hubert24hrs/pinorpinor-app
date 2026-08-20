@@ -11,6 +11,7 @@ import '../../features/credits/credits_screen.dart';
 import '../../features/discovery/discover_screen.dart';
 import '../../features/discovery/swipe_screen.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/favorites/favorites_screen.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/media/manage_media_screen.dart';
 import '../../features/messaging/conversation_screen.dart';
@@ -176,6 +177,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.matches,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const MatchesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.favorites,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const FavoritesScreen(),
       ),
       GoRoute(
         path: AppRoutes.editProfile,

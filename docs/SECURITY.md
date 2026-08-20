@@ -220,7 +220,7 @@ The client never chooses a storage path and never holds a storage credential.
 3. `POST /api/upload/confirm` — the server re-checks the key belongs to the
    caller (`isOwnStorageKey`, which rejects `..`, absolute paths, backslashes
    and anything outside the allowed character set) and that an object exists
-   there, then writes the row with `isApproved: false`.
+   there, then writes the row with `isApproved: true`.
 
 **Client-side validation is advisory.** MIME allow-list, 15MB images, 50MB
 videos, and per-type caps are all checked locally to fail fast with a clear
@@ -233,9 +233,38 @@ floor, with `keepExif: false`. That is bandwidth work whose more important side
 effect is removing GPS coordinates — shipping a member's home location inside a
 JPEG would be a far worse leak than anything the API exposes.
 
-**Moderation.** Every upload is held until a moderator releases it through the
-website's admin queue. The owner sees their own pending media marked "Awaiting
-review"; every other read path filters on `isApproved`.
+**Moderation is reactive, and this is a real residual risk.**
+
+Uploads used to be held until a moderator released them. That was reversed by
+the owner on 2026-08-14 (migration `20260814000000_emailless_signup`, with the
+matching change in `/api/upload/confirm`), and media now publishes the instant
+the transfer finishes. The admin Media Queue still lists everything, and
+rejecting an item deletes the object from the bucket rather than merely hiding
+the row — but **an image reaches the public before any human has seen it.**
+
+On a platform where members upload personal adult photographs, that means
+illegal or non-consensual content is publicly visible for however long it takes
+someone to notice and act. It is recorded here as an accepted risk rather than
+a solved problem, because it is the owner's decision and the migration's own
+comment says as much. It is listed again in § 16 Known risks.
+
+Two consequences for the app, both implemented:
+
+- **No screen may say "awaiting review".** Every such string is gone. Telling a
+  member their photo is queued when it is already public is a materially false
+  statement about who can see their body, and it is the kind of false statement
+  that changes what someone chooses to upload.
+- **`isApproved: false` now means *taken down*,** not *not yet released*. The
+  badge on a member's own media reads "Removed", and the account screen says a
+  moderator removed it.
+
+**Two flags, two decision-makers.** A media object reaches another member only
+when `isApproved` (the moderator's decision) **and** `isPublic` (the owner's)
+are both true. Keeping them separate is what lets a member pull a photo back
+without it losing its approval and having to queue again when they restore it.
+The app reads both. It offers no visibility switch, because no client endpoint
+sets `isPublic` — only admin paths do, and a control that silently fails is
+worse than no control.
 
 ---
 
@@ -265,6 +294,49 @@ visible in the resulting `wa.me` URL — WhatsApp click-to-chat has no opaque
 handle. What this design prevents is scraping and casual inspection, not a
 member reading their own address bar after being granted access. Truly opaque
 contact would require routing messages through a platform-owned number.
+
+### Presence is a bucket, never a timestamp
+
+`users.lastSeenAt` is written server-side by a throttled heartbeat inside
+`requireAuth()` and **never leaves the server**. Clients receive one of four
+coarse buckets — `ONLINE`, `TODAY`, `THIS_WEEK`, `AWAY` — and the app models it
+as an enum (`lib/data/models/presence.dart`) with no way to express anything
+finer.
+
+The reason is a safety one rather than a compliance one. "Last seen 21:47",
+published to strangers on a meetup platform and watched over a few days, is a
+movement log: it shows when someone sleeps, when they work, and when they are
+alone at home. The buckets are deliberately wide so that differencing two page
+loads cannot recover the underlying time.
+
+Three rules follow, and the app holds all three:
+
+- Never render anything more precise than the bucket's own label.
+- Never attempt to reconstruct a time from a bucket, or to cache buckets over
+  time to narrow one.
+- An unrecognised value parses to `AWAY`, the claim that asserts least. A
+  parser that defaulted to `ONLINE` would advertise absent members as present.
+
+The heartbeat is also written **after** the ban check, so a suspended account
+cannot keep showing as online.
+
+### Favourites are one-directional and silent
+
+`/api/favorites` is readable and writable only by its owner. The saved member is
+never notified, the count is never published on their profile, and **there is no
+endpoint that reports who saved whom** — that absence is the control, not an
+oversight.
+
+Publishing it would turn a private shortlist into a surveillance signal on a
+platform where women are browsed by strangers, and an unverifiable "saved 47
+times" number invites gaming besides. The app must not reconstruct the
+information client-side by diffing lists either; `FavoritesRepository` carries a
+note saying so, at the place someone would add the call.
+
+`savedAt` is kept in a map on `FavoritesPage` rather than on `ProfileSummary`,
+because when *this viewer* saved someone is a fact about the viewer's shortlist,
+not about the member. Keeping it off the shared model is what stops it leaking
+onto a surface that renders a profile from somewhere else.
 
 ---
 
@@ -383,36 +455,61 @@ would fail.
 
 ## 14. Account deletion
 
-**In-app route:** Settings → Account and deletion → Delete my account, behind a
-type-your-username confirmation.
+The app offers **two different things**, kept deliberately apart because they
+have different consequences and different confirmations.
 
-**What it does:** calls `DELETE /api/settings`, which sets `isActive: false`.
-From that moment `requireAuth()` answers 403 on every call, the profile
-disappears from every public surface (each read path filters on `isActive`), and
-the local session is cleared.
+### Deactivate — reversible
 
-**What it does not do:** erase rows or bucket objects. The app's copy says so
-rather than claiming an erasure the API does not perform, and offers a
-"Request full data erasure" link to support alongside it.
+**Route:** Settings → Account → Deactivate my account.
 
-**Operator procedure for full erasure** — this is the part that has to be run by
-hand on the website side:
+Calls `DELETE /api/settings`, which sets `isActive: false`. From that moment
+`requireAuth()` answers 403 on every call, the profile disappears from every
+public surface (each read path filters on `isActive`), and the local session is
+cleared. Nothing is destroyed; signing in again restores it.
 
-1. Confirm the request came from the account holder (reply from the registered
-   address, or a signed-in support ticket).
-2. Delete the member's storage objects under `users/<userId>/` from the
-   `pinorpinor-media` bucket.
-3. Delete the `users` row. Cascades remove the dating profile, media rows,
-   messages, swipes, matches, blocks, notifications, settings, verification
-   codes and reset tokens.
-4. Rows that must survive, and why: `reports` filed **about** the member
-   (safety records, retained for the moderation window), `credit_ledger_entries`
-   and `payments` (financial records), and `audit_logs` (moderation
-   accountability). Each is retained under legitimate interest and stated in the
-   privacy policy.
+### Delete permanently — irreversible, password-confirmed
 
-Nothing in step 3 or 4 is possible from the app, by design — an app that could
-hard-delete a member's history would be an app whose compromise could too.
+**Route:** Settings → Account → Delete my account permanently, behind **two**
+gates: typing the username, and entering the account password.
+
+Calls `DELETE /api/account`, which:
+
+1. removes every one of the member's objects from the storage bucket, **then**
+2. deletes the `users` row, cascading away the dating profile, media rows,
+   settings, wallet, ledger, favourites, blocks, contact requests, swipes,
+   matches and sessions.
+
+**That order is load-bearing and not interchangeable.** `storageKey` exists only
+on the `media` rows, and deleting the user cascades those away — so doing it the
+other way round would leave every photograph stranded in a private bucket with
+nothing left pointing at it. "We deleted your account but kept your photos
+forever, unreachable but present" is precisely the outcome a deletion request
+exists to prevent, on a platform where members upload personal adult images.
+
+**Why the password, when a valid session already proves identity.** Sessions are
+30-day JWTs. Without a second factor, anyone who picked up an unlocked phone
+could destroy the account and all its media in two taps, with no recovery path.
+The server re-checks it with bcrypt and answers 403 on a mismatch; the app never
+compares it locally.
+
+A storage failure is logged and does **not** abort the deletion. That is a
+deliberate trade made server-side: refusing to delete an account because one
+object could not be removed would leave someone unable to leave the platform at
+all, which is worse than a stranded file a sweep can collect later.
+
+### What still survives, and why
+
+`reports` filed **about** the member (safety records, retained for the
+moderation window), `credit_ledger_entries` and `payments` (financial records),
+and `audit_logs` (moderation accountability). Each is retained under legitimate
+interest and stated in the privacy policy.
+
+`audit_logs.actorUserId` is `SET NULL` on deletion rather than `Restrict`, with
+the actor's username denormalised onto `actorLabel` at write time. Before
+migration `20260815000000_auditlog_survives_actor` it was `Restrict`, which made
+**any account that had ever performed an admin action permanently undeletable** —
+the delete failed on the foreign key and surfaced as an opaque 500. An audit log
+has to outlive the person who wrote it without blocking their right to leave.
 
 ---
 
@@ -464,14 +561,37 @@ currently send from either client, because the provider key is not set. Women
 therefore cannot complete phone verification today — a platform-level blocker,
 not an app one.
 
-**7. No malware scanning of uploads.** Files are type- and size-checked and
-human-moderated, but not scanned. Media is served to app clients as images and
-video, never executed.
+**7. No malware scanning of uploads.** Files are type- and size-checked, but not
+scanned. Media is served to app clients as images and video, never executed.
 
 **8. The app trusts the origin it is compiled against.** A build produced with
 `--dart-define=PINORPINOR_API_ORIGIN` pointing somewhere hostile would send
 credentials there. That is a build-pipeline control, not a runtime one: only
 release from a trusted machine, with the origin verified.
+
+**9. Media publishes before any human review.** Reversed by the owner on
+2026-08-14; reasoned in full in §7. On a platform carrying personal adult
+imagery this is the most consequential risk on this list: illegal or
+non-consensual content is publicly visible until somebody notices it. Reducing
+it needs a backend change — a review queue with teeth, or automated scanning —
+not a client one. The app's contribution is to stop claiming a review that does
+not happen.
+
+**10. Accounts created since 2026-08-14 have no password-reset path.**
+Registration collects no email address, and `/api/forgot-password` looks members
+up by address. A forgotten password is a lost account, permanently. The join
+screen states this before the member commits, which is the only mitigation
+available client-side. A real fix is either an optional recovery address or
+WhatsApp OTP sign-in, both backend work.
+
+**11. The app's contracts are read from source, not proven by round trip.** The
+two breaks fixed on 2026-08-20 — the sign-in field name and the registration
+payload — were both derived correctly from the website's source when originally
+written, and both silently stopped matching when the website changed. Nothing in
+the build catches this class of drift. `test/unit/services_catalogue_test.dart`
+now closes it for the services catalogue by reading the real TypeScript, and
+that pattern should be extended wherever a contract is checkable statically. The
+general case still needs a signed-in session against a live origin.
 
 ---
 

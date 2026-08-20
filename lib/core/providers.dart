@@ -9,6 +9,8 @@ import '../data/repositories/messaging_repository.dart';
 import '../data/repositories/notifications_repository.dart';
 import '../data/repositories/profile_repository.dart';
 import '../data/repositories/safety_repository.dart';
+import '../data/repositories/dates_repository.dart';
+import '../data/repositories/favorites_repository.dart';
 import '../data/repositories/whatsapp_repository.dart';
 import 'network/api_client.dart';
 import 'network/api_exception.dart';
@@ -72,6 +74,14 @@ final creditsRepositoryProvider = Provider<CreditsRepository>(
 
 final whatsAppRepositoryProvider = Provider<WhatsAppRepository>(
   (ref) => WhatsAppRepository(ref.watch(apiClientProvider)),
+);
+
+final favoritesRepositoryProvider = Provider<FavoritesRepository>(
+  (ref) => FavoritesRepository(ref.watch(apiClientProvider)),
+);
+
+final datesRepositoryProvider = Provider<DatesRepository>(
+  (ref) => DatesRepository(ref.watch(apiClientProvider)),
 );
 
 /// True only in debug builds. Used to keep developer affordances out of release.

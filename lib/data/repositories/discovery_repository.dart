@@ -1,7 +1,21 @@
+import '../../core/constants/services.dart';
 import '../../core/network/api_client.dart';
 import '../models/messaging.dart';
 import '../models/profile.dart';
 import '../models/settings.dart';
+
+/// How recently a member must have been active to be included.
+enum ActivityFilter {
+  any(null, 'Any time'),
+  online('online', 'Online now'),
+  thisWeek('week', 'Active this week');
+
+  const ActivityFilter(this.wire, this.label);
+
+  /// The `activity` query value, or null for no constraint.
+  final String? wire;
+  final String label;
+}
 
 /// Filters the discovery surfaces accept.
 ///
@@ -17,6 +31,8 @@ class DiscoveryFilters {
     this.ageMax = 99,
     this.verifiedOnly = false,
     this.availableTodayOnly = false,
+    this.services = const <String>[],
+    this.activity = ActivityFilter.any,
   });
 
   final String? city;
@@ -26,6 +42,13 @@ class DiscoveryFilters {
   final bool verifiedOnly;
   final bool availableTodayOnly;
 
+  /// Catalogue ids. The backend matches on **overlap**, not containment — a
+  /// profile offering any one of these is included, which is what a member
+  /// selecting three things expects.
+  final List<String> services;
+
+  final ActivityFilter activity;
+
   static const none = DiscoveryFilters();
 
   bool get isDefault =>
@@ -33,7 +56,9 @@ class DiscoveryFilters {
       ageMin <= 18 &&
       ageMax >= 99 &&
       !verifiedOnly &&
-      !availableTodayOnly;
+      !availableTodayOnly &&
+      services.isEmpty &&
+      activity == ActivityFilter.any;
 
   /// How many filters are active, for the badge on the filter button.
   int get activeCount => active.length;
@@ -63,6 +88,23 @@ class DiscoveryFilters {
         label: 'Available today',
         clear: () => copyWith(availableTodayOnly: false),
       ),
+    if (activity != ActivityFilter.any)
+      ActiveFilter(
+        label: activity.label,
+        clear: () => copyWith(activity: ActivityFilter.any),
+      ),
+    // One chip per service rather than one for all of them: a member who
+    // picked four and wants to drop one should not have to clear the lot.
+    for (final id in services)
+      ActiveFilter(
+        label: serviceLabel(id),
+        clear: () => copyWith(
+          services: <String>[
+            for (final other in services)
+              if (other != id) other,
+          ],
+        ),
+      ),
   ];
 
   DiscoveryFilters copyWith({
@@ -73,6 +115,8 @@ class DiscoveryFilters {
     int? ageMax,
     bool? verifiedOnly,
     bool? availableTodayOnly,
+    List<String>? services,
+    ActivityFilter? activity,
   }) => DiscoveryFilters(
     city: clearCity ? null : (city ?? this.city),
     countryCode: countryCode ?? this.countryCode,
@@ -80,6 +124,8 @@ class DiscoveryFilters {
     ageMax: ageMax ?? this.ageMax,
     verifiedOnly: verifiedOnly ?? this.verifiedOnly,
     availableTodayOnly: availableTodayOnly ?? this.availableTodayOnly,
+    services: services ?? this.services,
+    activity: activity ?? this.activity,
   );
 
   Map<String, dynamic> toQuery({
@@ -95,6 +141,11 @@ class DiscoveryFilters {
     if (countryCode != null && countryCode!.isNotEmpty) 'country': countryCode,
     if (verifiedOnly) 'verified': 'true',
     if (availableTodayOnly) 'available': 'true',
+    // Comma-separated, and sanitised first: the route splits on "," and drops
+    // unknown ids, so sending a retired one would silently widen the result set
+    // rather than narrowing it.
+    if (services.isNotEmpty) 'services': sanitizeServiceIds(services).join(','),
+    if (activity.wire != null) 'activity': activity.wire,
   };
 }
 
@@ -141,6 +192,35 @@ class DiscoveryRepository {
     final json = await _api.getJson(
       '/api/ladies',
       query: filters.toQuery(page: page, limit: limit),
+    );
+    return ProfilePage.fromJson(json);
+  }
+
+  /// Members who are online, or were recently.
+  ///
+  /// Backs the "Online now" surface. It replaced a page on the website that
+  /// rendered invented streamers with fabricated viewer counts — there is no
+  /// streaming backend here, so the honest version is who is actually present.
+  ///
+  /// [strictlyOnline] narrows to the five-minute window. The default widens to
+  /// seven days so the section is not empty on a platform this young; every
+  /// member carries their real [Presence] bucket either way, so nothing is
+  /// presented as online that is not.
+  Future<ProfilePage> online({
+    bool strictlyOnline = false,
+    String? countryCode,
+    int page = 1,
+    int limit = 24,
+  }) async {
+    final json = await _api.getJson(
+      '/api/public/online',
+      query: <String, dynamic>{
+        'page': page,
+        'limit': limit,
+        if (strictlyOnline) 'strict': 'true',
+        if (countryCode != null && countryCode.isNotEmpty) 'country':
+            countryCode,
+      },
     );
     return ProfilePage.fromJson(json);
   }

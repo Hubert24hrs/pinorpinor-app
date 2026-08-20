@@ -15,24 +15,27 @@ import '../auth/auth_controller.dart';
 import '../auth/login_screen.dart';
 import '../profile/account_providers.dart';
 
-/// Account management and deletion.
+/// Account management, deactivation and deletion.
 ///
 /// **Store policy.** Both Google Play and the App Store require an app that
-/// lets people create an account to offer account deletion from inside the app,
-/// and to be honest about what deletion does. This screen is that route:
-/// Settings → Account and deletion → Delete my account.
+/// lets people create an account to offer account deletion from inside the
+/// app, and to be honest about what deletion does. This screen is that route.
 ///
-/// **What the backend actually does.** `DELETE /api/settings` sets
-/// `isActive: false`. From that moment `requireAuth()` answers 403 on every
-/// call, the profile disappears from every public surface (each read path
-/// filters on `isActive`), the session is dropped, and nobody can find, message
-/// or contact the member. That is a deactivation, and the copy below says so
-/// rather than claiming an erasure the API does not perform.
+/// **Two different things, deliberately kept apart.**
 ///
-/// The path to full erasure — removing rows and bucket objects — is a support
-/// request, with the address stated here so the requirement is met end to end.
-/// See `docs/SECURITY.md` § "Account deletion" for the operator procedure and
-/// the retention window.
+///   * *Deactivate* (`DELETE /api/settings`) sets `isActive: false`. Every
+///     read path filters on it, so the profile disappears everywhere and
+///     `requireAuth()` answers 403 — but nothing is destroyed. This is the
+///     right choice for someone taking a break.
+///   * *Delete permanently* (`DELETE /api/account`) erases the rows and
+///     removes every uploaded object from the storage bucket first. It cannot
+///     be undone, and it requires the account password because a 30-day
+///     session cookie is not a strong enough claim to destroy someone's
+///     photographs.
+///
+/// The screen used to offer only the first while calling it deletion, and
+/// pointed at support for erasure. The endpoint now exists, so it does the
+/// real thing.
 class AccountSettingsScreen extends ConsumerStatefulWidget {
   const AccountSettingsScreen({super.key});
 
@@ -42,21 +45,34 @@ class AccountSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
-  bool _deleting = false;
+  bool _busy = false;
 
-  Future<void> _deleteAccount() async {
-    final account = ref.read(myProfileProvider).valueOrNull;
-    if (account == null) return;
-
+  /// Reversible: hides the profile and keeps everything.
+  Future<void> _deactivateAccount() async {
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => _DeleteConfirmDialog(username: account.username),
+      builder: (context) => AlertDialog(
+        title: const Text('Deactivate your account?'),
+        content: const Text(
+          'Your profile stops appearing anywhere and nobody can contact you. '
+          'Nothing is deleted, and signing in again restores it.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Deactivate'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
 
-    setState(() => _deleting = true);
-
+    setState(() => _busy = true);
     try {
       await ref.read(profileRepositoryProvider).deactivateAccount();
       // Drop the local session immediately: the cookie is now useless and
@@ -66,8 +82,8 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text(
-            'Your account has been closed and your profile is no longer '
-            'visible.',
+            'Your account is deactivated. Sign in again at any time to '
+            'restore it.',
           ),
           duration: Duration(seconds: 6),
         ),
@@ -75,7 +91,43 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       context.go(AppRoutes.home);
     } on ApiException catch (error) {
       if (!mounted) return;
-      setState(() => _deleting = false);
+      setState(() => _busy = false);
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  /// Irreversible: erases the rows and the bucket objects.
+  Future<void> _deleteAccount() async {
+    final account = ref.read(myProfileProvider).valueOrNull;
+    if (account == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final password = await showDialog<String>(
+      context: context,
+      builder: (context) => _DeleteConfirmDialog(username: account.username),
+    );
+    if (password == null) return;
+
+    setState(() => _busy = true);
+
+    try {
+      await ref
+          .read(profileRepositoryProvider)
+          .deleteAccount(password: password);
+      await ref.read(authControllerProvider.notifier).signOut();
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Your account and all its media have been deleted.'),
+          duration: Duration(seconds: 6),
+        ),
+      );
+      context.go(AppRoutes.home);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      // A wrong password comes back as 403 with the server's own wording, so
+      // the member is told which of the two things went wrong.
       messenger.showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
@@ -114,43 +166,52 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
 
                 const SizedBox(height: AppSpacing.xxl),
                 Text(
+                  'Take a break',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Deactivating hides your profile everywhere and stops anyone '
+                  'contacting you. Nothing is deleted, and signing in again '
+                  'brings it all back.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _deactivateAccount,
+                  icon: const Icon(Icons.pause_circle_outline_rounded, size: 18),
+                  label: const Text('Deactivate my account'),
+                ),
+
+                const SizedBox(height: AppSpacing.xxl),
+                Text(
                   'Delete your account',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'Deleting closes your account immediately. Your profile, '
-                  'photos and videos stop appearing anywhere on Pinorpinor, '
-                  'nobody can message or contact you, and you are signed out '
-                  'on every device.',
+                  'This permanently erases your profile and deletes every '
+                  'photo and video you have uploaded from our storage. It '
+                  'cannot be undone, and you will be asked for your password '
+                  'to confirm.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 const InlineNotice.warning(
                   message:
-                      'Records we are required to keep — such as reports '
-                      'made about safety incidents and credit transactions — '
-                      'are retained. To have all remaining personal data '
-                      'erased, contact support after deleting.',
+                      'Records we are required to keep, such as reports made '
+                      'about safety incidents and credit transactions, are '
+                      'retained without your name attached.',
                 ),
                 const SizedBox(height: AppSpacing.lg),
-
-                OutlinedButton.icon(
-                  onPressed: _deleting
-                      ? null
-                      : () => LegalLinks.open(context, AppConfig.contactUrl),
-                  icon: const Icon(Icons.mail_outline_rounded, size: 18),
-                  label: const Text('Request full data erasure'),
-                ),
-                const SizedBox(height: AppSpacing.md),
 
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.error,
                     minimumSize: const Size(0, AppSpacing.minTouchTarget + 4),
                   ),
-                  onPressed: _deleting ? null : _deleteAccount,
-                  icon: _deleting
+                  onPressed: _busy ? null : _deleteAccount,
+                  icon: _busy
                       ? const SizedBox(
                           width: 18,
                           height: 18,
@@ -162,15 +223,18 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                           ),
                         )
                       : const Icon(Icons.delete_forever_rounded, size: 18),
-                  label: const Text('Delete my account'),
+                  label: const Text('Delete my account permanently'),
                 ),
 
-                const SizedBox(height: AppSpacing.xxl),
-                Text(
-                  'Prefer to take a break? Turning off "Show me in discovery" '
-                  'in Settings hides your profile without closing your account.',
-                  style: Theme.of(context).textTheme.bodySmall,
+                const SizedBox(height: AppSpacing.lg),
+                OutlinedButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => LegalLinks.open(context, AppConfig.contactUrl),
+                  icon: const Icon(Icons.mail_outline_rounded, size: 18),
+                  label: const Text('Contact support'),
                 ),
+                const SizedBox(height: AppSpacing.xxl),
               ],
             ),
           ),
@@ -180,6 +244,15 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
   }
 }
 
+/// Confirms permanent deletion, and collects the password the endpoint needs.
+///
+/// Two separate gates, because they guard different mistakes. Typing the
+/// username defends against a mis-tap: it makes the member state, in their own
+/// hand, which account they mean. The password defends against someone else
+/// holding an unlocked phone — a 30-day session cookie is not a strong enough
+/// claim to destroy a person's photographs, and the server re-checks it.
+///
+/// Pops the password on confirm, or null on cancel.
 class _DeleteConfirmDialog extends StatefulWidget {
   const _DeleteConfirmDialog({required this.username});
 
@@ -190,23 +263,28 @@ class _DeleteConfirmDialog extends StatefulWidget {
 }
 
 class _DeleteConfirmDialogState extends State<_DeleteConfirmDialog> {
-  final _controller = TextEditingController();
-  bool _matches = false;
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscure = true;
+
+  bool get _canDelete =>
+      _usernameController.text.trim().toLowerCase() ==
+          widget.username.toLowerCase() &&
+      _passwordController.text.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
-    _controller.addListener(() {
-      final matches =
-          _controller.text.trim().toLowerCase() ==
-          widget.username.toLowerCase();
-      if (matches != _matches) setState(() => _matches = matches);
-    });
+    _usernameController.addListener(_onChanged);
+    _passwordController.addListener(_onChanged);
   }
+
+  void _onChanged() => setState(() {});
 
   @override
   void dispose() {
-    _controller.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -214,35 +292,57 @@ class _DeleteConfirmDialogState extends State<_DeleteConfirmDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Delete your account?'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          const Text(
-            'This cannot be undone from the app. Type your username to '
-            'confirm.',
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextField(
-            controller: _controller,
-            autocorrect: false,
-            decoration: InputDecoration(
-              labelText: 'Username',
-              hintText: widget.username,
-              prefixText: '@',
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            const Text(
+              'This deletes your profile and every photo and video you have '
+              'uploaded. It cannot be undone.',
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _usernameController,
+              autocorrect: false,
+              decoration: InputDecoration(
+                labelText: 'Type your username to confirm',
+                hintText: widget.username,
+                prefixText: '@',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _passwordController,
+              obscureText: _obscure,
+              decoration: InputDecoration(
+                labelText: 'Your password',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    size: 20,
+                  ),
+                  tooltip: _obscure ? 'Show password' : 'Hide password',
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
       actions: <Widget>[
         TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Keep my account'),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-          onPressed: _matches ? () => Navigator.of(context).pop(true) : null,
-          child: const Text('Delete'),
+          onPressed: _canDelete
+              ? () => Navigator.of(context).pop(_passwordController.text)
+              : null,
+          child: const Text('Delete forever'),
         ),
       ],
     );

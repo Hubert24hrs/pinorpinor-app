@@ -66,7 +66,7 @@ prototype should. It is a reason not to take its data architecture.
 | Data source | 6 hardcoded profiles + Unsplash | Live API with pagination | **Keep ours** |
 | Error handling | 4 try/catch | `ApiException` with 12 typed kinds, per-kind copy and retry policy | **Keep ours** |
 | Form validation | None | `Validators` mirroring the backend, 30 unit tests | **Keep ours** |
-| Testing | 1 broken template test | 167 passing | **Keep ours** |
+| Testing | 1 broken template test | 218 passing | **Keep ours** |
 | Theme | Dark, `google_fonts` at runtime | Light brand identity, bundled variable fonts | **Keep ours** |
 | **Swipe deck UI** | Good gesture handling | **Missing** | **Adopt the pattern** |
 | **Filter chips** | Active-filter chips with per-chip clear | Filter sheet only | **Adopt the pattern** |

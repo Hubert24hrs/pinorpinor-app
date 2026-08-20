@@ -27,13 +27,21 @@ typedef UploadProgress = void Function(double value);
 ///   3. `POST /api/upload/confirm` — the server re-checks that the key sits
 ///      inside the caller's own folder (`isOwnStorageKey`) and that an object
 ///      really exists there, then writes the `media` row with
-///      `isApproved: false`.
+///      `isApproved: true`.
 ///
-/// That last flag is the moderation gate: uploads are held until a moderator
-/// releases them through the admin queue. The owner sees their own pending
-/// media flagged; nobody else sees it at all. The app says "Awaiting review" for
-/// the same reason the website does — a photo that silently fails to appear
-/// reads as a bug rather than as moderation.
+/// **Moderation is reactive, not preventive.** That was reversed by the owner
+/// on 2026-08-14: uploads used to be held until a moderator released them, and
+/// now they publish the instant the transfer finishes. The admin Media Queue
+/// still lists everything and rejecting still deletes the object from the
+/// bucket — but a photo reaches the public before any human sees it.
+///
+/// The app must not tell members their media is "awaiting review", because it
+/// is not. Anything that reads as a promise of pre-publication checking is
+/// wrong copy now, and on a platform where members upload personal adult
+/// photographs it is the kind of wrong that matters.
+///
+/// `isApproved` therefore now means "not taken down" rather than "released".
+/// It is still read, because a rejected item flips it back.
 class MediaRepository {
   MediaRepository(this._api);
 

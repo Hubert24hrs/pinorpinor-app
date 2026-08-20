@@ -249,14 +249,55 @@ the wrong thing to do.
 
 ---
 
+## Re-audit, 2026-08-20
+
+The website moved substantially between 2026-08-13 and 2026-08-15, and this
+document did not move with it. The re-audit compared every route under
+`src/app/api` against the endpoints the app actually calls. What it found:
+
+### Two shipped breaks
+
+Neither was a missing feature. Both were features the app *had*, calling
+contracts that no longer existed — which is the failure mode this document is
+least good at catching, because a row can read COMPLETE while the request 400s.
+
+| What | Was | Is |
+| --- | --- | --- |
+| Sign-in credential field | `email` | **`identifier`** — a username or an email, split on the `@`. The app's every sign-in was answering 401 |
+| Registration payload | 9 fields incl. `email`, `birthDate`, `gender`, `countryCode` | **6 fields**: `username`, `password`, `phone`, `bio`, `services`, `isAdult`. The app never sent `isAdult`, which the route rejects outright |
+
+### Genuinely new website features, now implemented
+
+| Feature | Endpoint | App |
+| --- | --- | --- |
+| Services catalogue | `dating_profiles.services` | `lib/core/constants/services.dart`, generated from the website's source and guarded by a drift test |
+| Member rates | `PATCH /api/profile` | `MemberRates` + `lib/core/utils/money.dart`, minor-unit safe |
+| Presence buckets | `users.lastSeenAt` | `Presence` enum; "Online now" badge |
+| Favourites | `/api/favorites` | `FavoritesRepository`, `/favorites`, heart control |
+| Online feed | `/api/public/online` | `DiscoveryRepository.online()` |
+| Permanent account deletion | `DELETE /api/account` | Password-confirmed, distinct from deactivation |
+| Date proposals | `/api/dates` | `DatesRepository` |
+| `state`, `build`, `languages` | `PATCH /api/profile` | On `ProfileSummary` and the detail screen |
+| Services + activity filters | `/api/public/profiles` | In the filter sheet, with per-chip clear |
+
+### A rule that reversed
+
+**Media is no longer held for moderation.** `20260814000000_emailless_signup`
+flipped `isApproved` to true on insert, and `/api/upload/confirm` was changed to
+match. Every "awaiting review" string in the app was therefore a false statement
+about who could see a member's photographs, and is gone. `isApproved: false` now
+means *taken down*.
+
+---
+
 ## Summary
 
-117 features mapped:
+128 features mapped:
 
 | Status | Count |
 | --- | --- |
-| COMPLETE | 97 |
-| PARTIAL | 8 |
+| COMPLETE | 107 |
+| PARTIAL | 9 |
 | NOT APPLICABLE | 11 |
 | BLOCKED | 1 |
 
@@ -267,6 +308,11 @@ something the website does not:
 - **18+ acknowledgement.** The website has no age gate; the app has one, because
   the stores expect it of an adult-oriented app.
 
+One new PARTIAL: **media visibility toggle.** `media.isPublic` is the owner's
+own control, but no client endpoint sets it — only admin paths do. The app reads
+it and offers no switch, because a control that silently fails is worse than no
+control.
+
 **No website feature is unintentionally missing.** Every PARTIAL and NOT
 APPLICABLE row above states its reason, and each falls into one of four
 categories: the website has no UI for it either; it is admin or SEO tooling that
@@ -275,3 +321,11 @@ notes flag as an open decision; or it would breach app store policy.
 
 The single BLOCKED item — server-pushed notifications — needs a backend change,
 not a client one.
+
+### What this document cannot tell you
+
+A row saying COMPLETE means the app implements the feature against the contract
+as read from the website's source. It does **not** mean a request has succeeded.
+The two breaks above were both COMPLETE rows in the previous revision, and both
+were wrong for six days. Only a signed-in session on a real device closes that
+gap.

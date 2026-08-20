@@ -138,11 +138,13 @@ class _AccountBody extends ConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
           ],
 
+          // Not "awaiting review": uploads publish on arrival now, so an
+          // unapproved row is one a moderator has taken down.
           if (account.hasPendingMedia) ...<Widget>[
             const InlineNotice.info(
               message:
-                  'Some of your photos are awaiting review. A moderator '
-                  'checks every upload before it appears to other members.',
+                  'Some of your photos have been removed by a moderator and '
+                  'are no longer visible to other members.',
             ),
             const SizedBox(height: AppSpacing.lg),
           ],

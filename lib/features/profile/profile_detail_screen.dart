@@ -20,6 +20,7 @@ import '../../shared/widgets/profile_image.dart';
 import '../../shared/widgets/states.dart';
 import '../auth/auth_controller.dart';
 import '../discovery/discovery_providers.dart';
+import '../favorites/favorites_screen.dart';
 import '../media/media_viewer.dart';
 import '../moderation/report_block_sheet.dart';
 
@@ -158,6 +159,15 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
           systemOverlayStyle: SystemUiOverlayStyle.light,
           leading: const _CircularBackButton(),
           actions: <Widget>[
+            FavoriteButton(
+              userId: profile.id,
+              isSignedIn: ref.watch(
+                authControllerProvider.select((state) => state.isSignedIn),
+              ),
+              onRequiresSignIn: () => unawaited(
+                context.push('${AppRoutes.login}?redirect=${AppRoutes.favorites}'),
+              ),
+            ),
             IconButton(
               icon: const _CircularIcon(icon: Icons.more_horiz_rounded),
               tooltip: 'More options',
@@ -278,7 +288,26 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                   ),
                 ],
 
-                if (profile.dateTypes.isNotEmpty) ...<Widget>[
+                if (profile.serviceOptions.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: AppSpacing.xxl),
+                  const _SectionTitle(title: 'Services'),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: <Widget>[
+                      // Rendered from the catalogue, never from the raw stored
+                      // ids — those are slugs like "gfe" and mean nothing to a
+                      // reader.
+                      for (final option in profile.serviceOptions)
+                        Chip(label: Text(option.label)),
+                    ],
+                  ),
+                ] else if (profile.dateTypes.isNotEmpty) ...<Widget>[
+                  // Only members who signed up before 2026-08-13 have these,
+                  // and only if they never picked services afterwards. Nothing
+                  // writes the column any more, so this is a read path for
+                  // existing data rather than a feature.
                   const SizedBox(height: AppSpacing.xxl),
                   const _SectionTitle(title: 'Date ideas'),
                   const SizedBox(height: AppSpacing.sm),
@@ -291,6 +320,8 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                     ],
                   ),
                 ],
+
+                ..._buildRates(profile),
 
                 ..._buildDetails(profile),
 
@@ -318,6 +349,114 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
     );
   }
 
+  /// The member's published rates.
+  ///
+  /// Rendered only when they have published something *and* left the block
+  /// switched on — `ratesVisible` is the member's own control and overrides
+  /// having filled anything in. An unpublished rate is omitted rather than
+  /// shown as a dash, because a blank cell reads like a price of zero.
+  List<Widget> _buildRates(ProfileSummary profile) {
+    final rates = profile.rates;
+    if (!rates.isVisible) return const <Widget>[];
+
+    final rows = rates.tableRows(profile.countryCode);
+    final perMinute = rates.perMinuteRows(profile.countryCode);
+    if (rows.isEmpty && perMinute.isEmpty) return const <Widget>[];
+
+    final theme = Theme.of(context);
+
+    return <Widget>[
+      const SizedBox(height: AppSpacing.xxl),
+      const _SectionTitle(title: 'Rates'),
+      const SizedBox(height: AppSpacing.sm),
+      Container(
+        decoration: BoxDecoration(
+          color: AppColors.bgSecondary,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border),
+        ),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            if (rows.isNotEmpty) ...<Widget>[
+              Row(
+                children: <Widget>[
+                  const Expanded(flex: 3, child: SizedBox.shrink()),
+                  Expanded(
+                    flex: 2,
+                    child: Text('Incall', style: theme.textTheme.bodySmall),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text('Outcall', style: theme.textTheme.bodySmall),
+                  ),
+                ],
+              ),
+              const Divider(),
+              for (final row in rows) ...<Widget>[
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          row.label,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          row.incall ?? '—',
+                          style: theme.textTheme.titleSmall,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          row.outcall ?? '—',
+                          style: theme.textTheme.titleSmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+            if (perMinute.isNotEmpty) ...<Widget>[
+              if (rows.isNotEmpty) const Divider(height: AppSpacing.lg),
+              for (final row in perMinute)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          row.label,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                      Text(row.amount, style: theme.textTheme.titleSmall),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      Text(
+        // Said plainly, because the per-minute rows otherwise read like an
+        // in-app product. Nothing here is bought or delivered through the app.
+        'Rates are set by the member and arranged directly with them. '
+        'Pinorpinor does not process these payments.',
+        style: theme.textTheme.bodySmall,
+      ),
+    ];
+  }
+
   List<Widget> _buildDetails(ProfileSummary profile) {
     final rows = <(IconData, String, String)>[
       if (profile.relationshipIntent != null)
@@ -328,8 +467,12 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
         ),
       if (profile.height != null)
         (Icons.height_rounded, 'Height', profile.height!),
+      if (profile.build != null)
+        (Icons.accessibility_new_rounded, 'Build', profile.build!),
       if (profile.ethnicity != null)
         (Icons.person_outline_rounded, 'Ethnicity', profile.ethnicity!),
+      if (profile.languages.isNotEmpty)
+        (Icons.translate_rounded, 'Languages', profile.languages.join(', ')),
       if (profile.placeLabel != null)
         (Icons.place_outlined, 'Location', profile.placeLabel!),
     ];

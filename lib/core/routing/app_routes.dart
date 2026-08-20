@@ -40,6 +40,7 @@ class AppRoutes {
   static const credits = '/credits';
   static const contactRequests = '/contact-requests';
   static const matches = '/matches';
+  static const favorites = '/favorites';
 
   // Settings
   static const settings = '/settings';
