@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pinorpinor_app/core/config/app_config.dart';
 import 'package:pinorpinor_app/core/constants/navigation.dart';
 
 /// Guards the menu against drifting from the website's `src/lib/navigation.ts`.
@@ -53,6 +54,26 @@ void main() {
           if (item.route != null) item.route!,
       ];
       expect(routes.toSet(), hasLength(routes.length));
+    });
+
+    test('website entries stay on the app origin', () {
+      // AppDrawer builds these as `AppConfig.apiOrigin + href`, and
+      // LegalLinks.open asserts the result is on that origin -- it refuses to
+      // launch anything else, so a stray absolute URL here would trip the
+      // assert in debug and open an off-platform page in release.
+      for (final item in allItems()) {
+        if (item.kind != NavKind.website) continue;
+        expect(
+          item.href,
+          startsWith('/'),
+          reason: '${item.label} must be a path, not an absolute URL',
+        );
+        expect(item.href, isNot(contains('://')), reason: item.label);
+        expect(
+          '${AppConfig.apiOrigin}${item.href}',
+          startsWith(AppConfig.apiOrigin),
+        );
+      }
     });
 
     test('ships no admin entry', () {
