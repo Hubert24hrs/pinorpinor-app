@@ -1,6 +1,7 @@
 import 'enums.dart';
 import 'json.dart';
 import 'media_item.dart';
+import 'rates.dart';
 
 /// The signed-in member's own account, from `GET /api/profile`.
 ///
@@ -163,6 +164,11 @@ class DatingProfile {
     this.location,
     this.relationshipIntent,
     this.dateTypes = const <String>[],
+    this.services = const <String>[],
+    this.state,
+    this.build,
+    this.languages = const <String>[],
+    this.rates = MemberRates.empty,
     this.isAvailableToday = false,
     this.isPublic = true,
     this.isDiscoverable = true,
@@ -184,7 +190,27 @@ class DatingProfile {
   final String? countryCode;
   final String? location;
   final RelationshipIntent? relationshipIntent;
+
+  /// **Deprecated.** The pre-2026-08-13 "Preferred Date Activities". Read-only:
+  /// `profileUpdateSchema` deliberately refuses it, so nothing can write it any
+  /// more. Kept so a member who still has some sees them. [services] replaced it.
   final List<String> dateTypes;
+
+  /// Catalogue ids from `lib/core/constants/services.dart`, never labels.
+  final List<String> services;
+
+  /// Subdivision within the country. Validated server-side against that
+  /// country's list where one exists, free text where it does not.
+  final String? state;
+
+  /// Body type, from the website's `BUILD_OPTIONS`.
+  final String? build;
+
+  final List<String> languages;
+
+  /// The member's own rates, in minor units. See `lib/core/utils/money.dart`.
+  final MemberRates rates;
+
   final bool isAvailableToday;
 
   /// Men's profiles are created private (`isPublic: false`) and never listed.
@@ -213,6 +239,11 @@ class DatingProfile {
     location: asStringOrNull(json['location']),
     relationshipIntent: RelationshipIntent.parse(json['relationshipIntent']),
     dateTypes: asStringList(json['dateTypes']),
+    services: asStringList(json['services']),
+    state: asStringOrNull(json['state']),
+    build: asStringOrNull(json['build']),
+    languages: asStringList(json['languages']),
+    rates: MemberRates.fromProfileJson(json),
     isAvailableToday: asBool(json['isAvailableToday']),
     isPublic: asBool(json['isPublic'], fallback: true),
     isDiscoverable: asBool(json['isDiscoverable'], fallback: true),

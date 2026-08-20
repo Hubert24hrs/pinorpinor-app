@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/countries.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/constants/services.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -41,7 +42,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   String? _countryCode;
   RelationshipIntent? _intent;
-  final Set<String> _dateTypes = <String>{};
+  final Set<String> _services = <String>{};
   bool _availableToday = false;
 
   bool _initialised = false;
@@ -72,9 +73,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       account.profile.countryCode ?? account.profile.country,
     );
     _intent = account.profile.relationshipIntent;
-    _dateTypes
+    _services
       ..clear()
-      ..addAll(account.profile.dateTypes);
+      ..addAll(account.profile.services);
     _availableToday = account.profile.isAvailableToday;
   }
 
@@ -100,7 +101,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ethnicity: _ethnicityController.text,
             country: _countryCode,
             relationshipIntent: _intent,
-            dateTypes: _dateTypes.toList(),
+            services: _services.toList(),
             isAvailableToday: _availableToday,
           );
 
@@ -270,28 +271,48 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
               const SizedBox(height: AppSpacing.xl),
               Text(
-                'Date ideas you enjoy',
+                'What you offer',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: <Widget>[
-                  for (final type in kDateTypeOptions)
-                    FilterChip(
-                      label: Text(type),
-                      selected: _dateTypes.contains(type),
-                      onSelected: (selected) => setState(() {
-                        if (selected) {
-                          _dateTypes.add(type);
-                        } else {
-                          _dateTypes.remove(type);
-                        }
-                      }),
-                    ),
-                ],
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'These appear on your profile and are how members find you in '
+                'search.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
+              const SizedBox(height: AppSpacing.sm),
+              // Grouped, and rendered from the catalogue rather than from the
+              // stored ids -- those are slugs and mean nothing to a reader.
+              // Retired entries are absent here but still render on the
+              // profile, so a member keeps what they already chose.
+              for (final group in servicesByGroup()) ...<Widget>[
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.sm),
+                  child: Text(
+                    group.group.label,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: <Widget>[
+                    for (final option in group.options)
+                      FilterChip(
+                        label: Text(option.label),
+                        selected: _services.contains(option.id),
+                        onSelected: (selected) => setState(() {
+                          if (selected) {
+                            _services.add(option.id);
+                          } else {
+                            _services.remove(option.id);
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+              ],
 
               const SizedBox(height: AppSpacing.lg),
               SwitchListTile(

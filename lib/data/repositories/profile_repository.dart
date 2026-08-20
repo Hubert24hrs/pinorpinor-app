@@ -1,9 +1,11 @@
+import '../../core/constants/services.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../models/account.dart';
 import '../models/enums.dart';
 import '../models/json.dart';
 import '../models/profile.dart';
+import '../models/rates.dart';
 import '../models/settings.dart';
 
 /// Reads and writes to the member's own profile, and reads other members'.
@@ -21,6 +23,18 @@ class ProfileRepository {
   /// The backend whitelists what it accepts (`profileUpdateSchema`), so a field
   /// this client does not know about cannot be smuggled through — including the
   /// boost and credit columns, which is what stops a member self-promoting.
+  ///
+  /// **`dateTypes` is deliberately not here.** It is the deprecated
+  /// pre-2026-08-13 "Preferred Date Activities" column, and `profileUpdateSchema`
+  /// leaves it out on purpose so a client cannot keep populating a column
+  /// nothing reads. Zod strips unknown keys silently rather than erroring, so
+  /// this app used to send it and have it dropped without a word — an editor
+  /// for a field that could not be saved. [services] replaced it.
+  ///
+  /// **Rates are sent in MAJOR units, as typed.** The route converts with
+  /// `parseRateInput` against the profile's own currency; converting here as
+  /// well is how a rate ends up stored a hundred times out. See
+  /// `lib/core/utils/money.dart`.
   Future<void> updateProfile({
     String? displayName,
     String? bio,
@@ -29,9 +43,17 @@ class ProfileRepository {
     String? ethnicity,
     String? city,
     String? country,
+    String? state,
+    String? build,
+    List<String>? languages,
     RelationshipIntent? relationshipIntent,
-    List<String>? dateTypes,
+    List<String>? services,
     bool? isAvailableToday,
+    bool? isPublic,
+    bool? isDiscoverable,
+    String? currency,
+    bool? ratesVisible,
+    Map<String, String>? rates,
   }) async {
     final body = <String, dynamic>{
       if (displayName != null) 'displayName': displayName.trim(),
@@ -41,10 +63,23 @@ class ProfileRepository {
       if (ethnicity != null) 'ethnicity': ethnicity.trim(),
       if (city != null) 'city': city.trim(),
       'country': ?country,
+      // `state` is nullable server-side, and clearing it is a real operation —
+      // so an empty string is sent as null rather than skipped.
+      if (state != null) 'state': state.trim().isEmpty ? null : state.trim(),
+      if (build != null) 'build': build.trim().isEmpty ? null : build.trim(),
+      'languages': ?languages,
       if (relationshipIntent != null)
         'relationshipIntent': relationshipIntent.wire,
-      'dateTypes': ?dateTypes,
+      // Whitelisted before sending. The backend does this too; doing it here
+      // means an id retired since the screen was built is dropped quietly
+      // instead of failing the whole save.
+      if (services != null) 'services': sanitizeServiceIds(services),
       'isAvailableToday': ?isAvailableToday,
+      'isPublic': ?isPublic,
+      'isDiscoverable': ?isDiscoverable,
+      'currency': ?currency,
+      'ratesVisible': ?ratesVisible,
+      if (rates != null) 'rates': MemberRates.patchBody(rates),
     };
     if (body.isEmpty) return;
     await _api.patchJson('/api/profile', body: body);
