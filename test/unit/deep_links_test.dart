@@ -181,6 +181,23 @@ void main() {
       expect(AppRoutes.isProtected('/profile/zainab'), isFalse);
     });
 
+    test('guards every screen whose endpoint requires a session', () {
+      // Saved profiles is the one that bit: /api/favorites requires auth, so
+      // without a guard a signed-out visitor reaching it by deep link is told
+      // their session expired rather than being asked to sign in.
+      expect(AppRoutes.isProtected(AppRoutes.favorites), isTrue);
+      expect(AppRoutes.isProtected(AppRoutes.matches), isTrue);
+      expect(AppRoutes.isProtected(AppRoutes.swipe), isTrue);
+    });
+
+    test('leaves the public sections open', () {
+      // These are backed by /api/public/* and work signed out, like browsing.
+      // Guarding them would put a sign-in wall where the website has none.
+      expect(AppRoutes.isProtected(AppRoutes.live), isFalse);
+      expect(AppRoutes.isProtected(AppRoutes.videos), isFalse);
+      expect(AppRoutes.isProtected(AppRoutes.locations), isFalse);
+    });
+
     test('recognises auth-only locations', () {
       expect(AppRoutes.isAuthOnly('/login'), isTrue);
       expect(AppRoutes.isAuthOnly('/join'), isTrue);

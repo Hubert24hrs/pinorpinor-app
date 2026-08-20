@@ -67,8 +67,18 @@ class AppRoutes {
     credits,
     contactRequests,
     matches,
+    // `/api/favorites` requires a session. Without this the screen loads for a
+    // signed-out visitor, the request 401s, and `ApiClient` reports that as an
+    // invalidated session — so somebody who never signed in is told their
+    // session expired instead of being asked to sign in. Reachable by deep
+    // link, so it is not a theoretical path.
+    favorites,
     settings,
   };
+
+  /// Public counterparts, listed to make the omission deliberate rather than
+  /// forgotten: `/live`, `/videos` and `/locations` are backed by
+  /// `/api/public/*` endpoints that work signed out, exactly as browsing does.
 
   /// Paths a signed-in member has no reason to see.
   static const Set<String> authOnly = <String>{
