@@ -98,7 +98,7 @@ three deep-link entries (`pinorpinor://`, `pinorpinor.com`,
 
 | Store | Expected | Notes |
 | --- | --- | --- |
-| Google Play (IARC) | Mature 17+ / PEGI 16+ | Dating, user-generated photos, unmoderated-in-realtime messaging |
+| Google Play (IARC) | Mature 17+ / PEGI 16+ | Dating, user-generated photos, unmoderated-in-realtime messaging, **and since 2026-08-21 an explicit service list and adult session labels on public profiles** |
 | App Store | 17+ | Frequent/Intense Mature or Suggestive Themes |
 | Target audience | **18 and over only** | Do not tick any child audience bracket |
 
@@ -143,6 +143,63 @@ shapes:
 Either satisfies the guideline. Neither is client work, and neither can be
 faked from the app. What the app *does* do is refuse to misrepresent the
 situation: no screen says "awaiting review", because nothing is.
+
+## What the 2026-08-21 release changed, and why it matters here
+
+Added 2026-08-22. Two things landed on the website and are now mirrored in the
+app, and **both change what a reviewer sees** rather than only what the code
+does. Neither is the app's decision to reverse; both belong in this document
+because a submission planned against the old content profile would be planned
+against the wrong app.
+
+### 1. The explicit service list is back on public profiles
+
+Between 2026-08-20 and 2026-08-21 the platform removed its explicit catalogue and
+then restored it, behind a gate: a member whose primary service is **Hookup** may
+publish a list drawn from 36 explicit terms, alongside short-time, overnight and
+weekend rates.
+
+For Google Play this sits within a Mature 17+ / adult-content listing, which the
+app already expects.
+
+**For the App Store this is the more serious of the two exposures, and probably
+more serious than the 1.2 gap above.** Guideline 1.1.4 refuses "overtly sexual or
+pornographic material", and App Review has consistently read a priced list of
+explicit in-person services as facilitating prostitution, which is refused
+outright rather than age-gated. The app renders that list truthfully, from the
+member's own stored data — there is no version of this the client can soften
+without lying about what a profile says.
+
+Three honest options, in order of how much they cost the platform:
+
+1. **Ship Android first.** Play's adult-content policies are the ones this
+   platform was built against, and the Android build is the one that exists.
+2. **Ask the owner whether the iOS build omits the explicit block.** Technically
+   a ten-line gate. It means the two apps show different things about the same
+   member, which is its own problem and must be a deliberate decision, not a
+   quiet one.
+3. **Submit as-is and expect the rejection to be about 1.1.4**, not about
+   anything in this repository.
+
+This is the owner's call. What must not happen is a submission made in the belief
+that the app's content is what it was a week ago.
+
+### 2. Live-session prices are displayed in the app
+
+Members can publish a per-minute price in **credits** for Custom video, Custom
+audio, Erotic video and Sex chat. The app shows those prices and says, on the
+profile and on the "Get the App" screen, that no session can be started or paid
+for — because none can: there is no session backend on either client.
+
+While that stays true, this is descriptive text and no payment rule applies. **It
+stops being true the moment a session can be started in the app.** At that point
+credits are being spent on in-app digital content and both stores' billing rules
+apply in full — see the payments section below, which is currently satisfied only
+because the app neither sells credits nor spends them on anything delivered
+in-app.
+
+If live sessions are ever built, they are a **billing** change and a **content
+rating** change before they are a feature. Read this section again first.
 
 ## Payments — why there is no in-app purchase
 
@@ -267,9 +324,9 @@ Results from this repository:
 | Command | Result |
 | --- | --- |
 | `flutter analyze` | **No issues found** |
-| `flutter test` | **261 tests, all passing** |
+| `flutter test` | **336 tests, all passing** |
 | `dart format .` | Clean |
-| `flutter build apk --debug --target-platform android-arm64` | **Succeeded** — `build/app/outputs/flutter-apk/app-debug.apk`, 116.1 MB. 1367s cold, 50s incremental |
+| `flutter build apk --debug --target-platform android-arm64` | **Succeeded** — `build/app/outputs/flutter-apk/app-debug.apk`, 122 MB. Rebuilt 2026-08-22 |
 | `flutter build appbundle --release` | **Not run** — needs `android/key.properties`, which only the owner can create |
 
 The debug APK is **arm64-only**. A universal build kept timing out on this
@@ -326,9 +383,21 @@ real Android phone and walk the whole journey. `DEPLOYMENT.md` §
 
 In the order they block a submission:
 
+0. **Decide what the iOS build shows.** See "What the 2026-08-21 release
+   changed" above. The explicit service list now published on member profiles is
+   a plausible outright rejection under App Store guideline 1.1.4, not an
+   age-rating question, and no client-side change makes it go away without
+   misrepresenting a member's own profile. Android is unaffected and is the
+   build that exists. **This decision comes before any of the work below**,
+   because several items only make sense once it is made.
 1. **Approve real member media** so discovery is not empty. (Backend)
 2. **Set the SMS provider key** so phone verification completes. (Backend)
-3. **Create the upload keystore** and `android/key.properties`.
+3. **Create the upload keystore** and `android/key.properties`. Nothing in this
+   repository can do this: it means choosing passwords, and those are the
+   owner's. The Gradle config already reads the file if it exists and falls back
+   to debug signing if it does not, which is the intended failure mode — Play
+   rejects a debug-signed upload rather than accepting a badly-signed one. The
+   commands are in `docs/DEPLOYMENT.md`.
 4. **Build and verify the signed `.aab`.**
 5. **Create a Play Console app**, complete the store listing and all content
    declarations.
