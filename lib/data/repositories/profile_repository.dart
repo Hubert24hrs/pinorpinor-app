@@ -1,12 +1,28 @@
+import '../../core/constants/hookup_services.dart';
+import '../../core/constants/primary_services.dart';
 import '../../core/constants/services.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../models/account.dart';
 import '../models/enums.dart';
 import '../models/json.dart';
+import '../models/live_sessions.dart';
 import '../models/profile.dart';
 import '../models/rates.dart';
 import '../models/settings.dart';
+
+/// Distinguishes "leave this field alone" from "set it to null".
+///
+/// Only `primaryService` needs it: absent and null are different requests
+/// there, and Dart's optional parameters cannot express both with one nullable
+/// type. Absent means the caller is not touching the field; null means the
+/// member no longer wants a badge, and without the difference there would be no
+/// way to withdraw a claim once published.
+///
+/// Public because it is the default value of a parameter, so anything
+/// overriding [ProfileRepository.updateProfile] — a fake in a test — has to name
+/// it too.
+const Object unsetPrimaryService = Object();
 
 /// Reads and writes to the member's own profile, and reads other members'.
 class ProfileRepository {
@@ -48,13 +64,28 @@ class ProfileRepository {
     List<String>? languages,
     RelationshipIntent? relationshipIntent,
     List<String>? services,
+    Object? primaryService = unsetPrimaryService,
+    List<String>? hookupServices,
     bool? isAvailableToday,
     bool? isPublic,
     bool? isDiscoverable,
+    bool? showOnline,
     String? currency,
     bool? ratesVisible,
     Map<String, String>? rates,
+    Map<String, String>? liveRates,
   }) async {
+    // The gate, mirrored on the way out.
+    //
+    // The server re-derives it from the STORED row, not from this payload, and
+    // that difference matters: a member editing only their explicit list sends
+    // no primaryService at all, and reading the payload alone would wipe the
+    // list they came to edit. So the caller passes the effective value, and when
+    // it is absent the list is sent unchanged for the server to gate.
+    final bool? wantsHookup = primaryService == unsetPrimaryService
+        ? null
+        : offersHookup(primaryService as String?);
+
     final body = <String, dynamic>{
       if (displayName != null) 'displayName': displayName.trim(),
       if (bio != null) 'bio': bio.trim(),
@@ -63,7 +94,7 @@ class ProfileRepository {
       if (ethnicity != null) 'ethnicity': ethnicity.trim(),
       if (city != null) 'city': city.trim(),
       'country': ?country,
-      // `state` is nullable server-side, and clearing it is a real operation —
+      // `state` is nullable server-side, and clearing it is a real operation --
       // so an empty string is sent as null rather than skipped.
       if (state != null) 'state': state.trim().isEmpty ? null : state.trim(),
       if (build != null) 'build': build.trim().isEmpty ? null : build.trim(),
@@ -74,12 +105,34 @@ class ProfileRepository {
       // means an id retired since the screen was built is dropped quietly
       // instead of failing the whole save.
       if (services != null) 'services': sanitizeServiceIds(services),
+      // Absent means "leave it alone"; explicit null means "I no longer want a
+      // badge". Both are real requests and the schema accepts both, which is
+      // why this parameter is `Object?` against a sentinel rather than a plain
+      // nullable -- without the distinction there would be no way to withdraw a
+      // claim once published.
+      if (primaryService != unsetPrimaryService)
+        'primaryService': sanitizePrimaryService(primaryService),
+      if (hookupServices != null)
+        'hookupServices': sanitizeHookupServices(
+          hookupServices,
+          // Unknown here means the caller is not touching the primary service,
+          // so the stored one still governs and the server applies it.
+          offersHookup: wantsHookup ?? true,
+        ),
       'isAvailableToday': ?isAvailableToday,
       'isPublic': ?isPublic,
       'isDiscoverable': ?isDiscoverable,
+      // The presence switch. Distinct from `isDiscoverable`: this withholds
+      // when she was last active, that withholds her profile.
+      'showOnline': ?showOnline,
       'currency': ?currency,
       'ratesVisible': ?ratesVisible,
       if (rates != null) 'rates': MemberRates.patchBody(rates),
+      // A separate key from `rates`, deliberately. These are CREDITS: sending
+      // them under `rates` would put them through parseRateInput and multiply
+      // every one of them by the currency's minor unit.
+      if (liveRates != null)
+        'liveRates': MemberLiveSessions.patchBody(liveRates),
     };
     if (body.isEmpty) return;
     await _api.patchJson('/api/profile', body: body);

@@ -105,7 +105,11 @@ final browseProvider = StateNotifierProvider<BrowseNotifier, PagedProfiles>((
   return notifier;
 });
 
-/// The home rail of women with an approved photo.
+/// The home rail: members with an approved photo, scoped server-side.
+///
+/// Named for the endpoint (`/api/ladies`), not for who it returns. Since
+/// 2026-08-21 that route filters on `resolveVisibleGenders()` like every other
+/// listing, so a signed-in member whose preference includes men sees men here.
 final ladiesProvider = FutureProvider.autoDispose<ProfilePage>((ref) async {
   return ref.watch(discoveryRepositoryProvider).ladies(limit: 12);
 });

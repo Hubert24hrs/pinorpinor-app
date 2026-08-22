@@ -105,6 +105,11 @@ class DeepLinks {
       case 'locations':
         return AppRoutes.locations;
 
+      // Every live-session option on the website links to /app, so this is a
+      // link members will actually receive.
+      case 'app':
+        return AppRoutes.getTheApp;
+
       case 'favorites':
       case 'saved':
         return AppRoutes.favorites;

@@ -8,6 +8,7 @@ import 'features/auth/auth_controller.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/onboarding/age_gate_controller.dart';
 import 'features/onboarding/age_gate_screen.dart';
+import 'features/presence/presence_heartbeat.dart';
 
 /// The application root.
 class PinorpinorApp extends ConsumerStatefulWidget {
@@ -36,38 +37,44 @@ class _PinorpinorAppState extends ConsumerState<PinorpinorApp> {
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
 
-    return DeepLinkHandler(
-      router: router,
-      child: MaterialApp.router(
-        title: 'Pinorpinor',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        // The website ships a single light identity with no theme switcher, so
-        // the app follows it rather than inventing a dark mode the brand has
-        // never had. The theming is structured to accept one later.
-        themeMode: ThemeMode.light,
-        routerConfig: router,
-        builder: (context, child) {
-          // Respect the platform text-size setting, but stop an extreme scale
-          // from breaking layouts that must still work at 320px wide.
-          final media = MediaQuery.of(context);
-          return MediaQuery(
-            data: media.copyWith(
-              textScaler: media.textScaler.clamp(
-                minScaleFactor: 0.85,
-                maxScaleFactor: 1.4,
+    // The heartbeat wraps everything rather than sitting on a screen: presence
+    // is a property of the member being in the app at all, not of whichever tab
+    // happens to be open, and a member reading one conversation for ten minutes
+    // is exactly as present as one flicking through discovery.
+    return PresenceHeartbeat(
+      child: DeepLinkHandler(
+        router: router,
+        child: MaterialApp.router(
+          title: 'Pinorpinor',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          // The website ships a single light identity with no theme switcher, so
+          // the app follows it rather than inventing a dark mode the brand has
+          // never had. The theming is structured to accept one later.
+          themeMode: ThemeMode.light,
+          routerConfig: router,
+          builder: (context, child) {
+            // Respect the platform text-size setting, but stop an extreme scale
+            // from breaking layouts that must still work at 320px wide.
+            final media = MediaQuery.of(context);
+            return MediaQuery(
+              data: media.copyWith(
+                textScaler: media.textScaler.clamp(
+                  minScaleFactor: 0.85,
+                  maxScaleFactor: 1.4,
+                ),
               ),
-            ),
-            // The gate wraps the router's output rather than being a route.
-            //
-            // As a route it would be reachable by deep link and skippable by
-            // one — `pinorpinor://profile/x` would land straight on a profile
-            // photo without the notice ever rendering. Wrapping the whole
-            // navigator means nothing paints until the acknowledgement is
-            // resolved, whatever brought the member into the app.
-            child: _AgeGateBoundary(child: child ?? const SizedBox.shrink()),
-          );
-        },
+              // The gate wraps the router's output rather than being a route.
+              //
+              // As a route it would be reachable by deep link and skippable by
+              // one — `pinorpinor://profile/x` would land straight on a profile
+              // photo without the notice ever rendering. Wrapping the whole
+              // navigator means nothing paints until the acknowledgement is
+              // resolved, whatever brought the member into the app.
+              child: _AgeGateBoundary(child: child ?? const SizedBox.shrink()),
+            );
+          },
+        ),
       ),
     );
   }

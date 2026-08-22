@@ -297,7 +297,10 @@ void main() {
             'bio': 'A bio comfortably past twenty characters long.',
             'city': 'Lagos',
             'countryCode': 'NG',
-            'dateTypes': <String>['Dinner Dates'],
+            // The completeness check moved off the deprecated dateTypes column
+            // and onto the primary service on 2026-08-22: that is the field a
+            // member must choose for their card to carry a badge at all.
+            'primaryService': 'dinner_date',
           },
           'media': <Map<String, dynamic>>[
             <String, dynamic>{'id': 'm', 'mediaType': 'PROFILE_PHOTO'},

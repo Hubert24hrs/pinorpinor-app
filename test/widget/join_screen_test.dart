@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinorpinor_app/core/constants/services.dart';
+import 'package:pinorpinor_app/core/constants/primary_services.dart';
 import 'package:pinorpinor_app/features/auth/join_screen.dart';
 import 'package:pinorpinor_app/shared/widgets/brand.dart';
 
@@ -10,11 +10,16 @@ import '../helpers/pump_app.dart';
 /// Registration carries the platform's hardest rules, so its gating is tested
 /// at the widget level rather than only in the validators.
 ///
-/// The flow was rebuilt on 2026-08-14 to match the backend's six-field
-/// contract. Gender, date of birth and country are no longer collected at all —
-/// gender is forced server-side, age is a tickbox, and the country is derived
-/// from the WhatsApp number. The tests that asserted those steps are gone with
-/// them; what replaces them asserts the rules that actually still exist.
+/// The flow was rebuilt on 2026-08-14 and again on 2026-08-21, and both
+/// rebuilds broke registration outright without breaking a single test, a build
+/// or a type. What is asserted here is the current contract:
+///
+///   * date of birth and country are still not collected — age is a tickbox and
+///     the country is derived from the WhatsApp number;
+///   * **gender is collected again**, and the route 400s without it;
+///   * **one primary service is required**, and the route 400s without that too;
+///   * the hookup branch only exists under one of the six choices, and nothing
+///     it holds may be sent under any other.
 void main() {
   Future<void> pumpJoin(
     WidgetTester tester,
@@ -29,10 +34,44 @@ void main() {
     );
   }
 
-  // Derived from the catalogue rather than hardcoded. The catalogue is
-  // generated from the website and was reworked once mid-development; a test
-  // naming a literal label breaks on a rewording that is not a defect.
-  final firstService = kServices.firstWhere((s) => !s.retired);
+  // Derived from the catalogue rather than hardcoded. It is generated from the
+  // website and has been reworked twice; a test naming a literal label breaks on
+  // a rewording that is not a defect.
+  final PrimaryServiceOption nonHookup = kPrimaryServices.firstWhere(
+    (s) => s.id != kHookupId,
+  );
+  final PrimaryServiceOption hookup = kPrimaryServices.firstWhere(
+    (s) => s.id == kHookupId,
+  );
+
+  /// Fills the WhatsApp/bio step and advances to the service step.
+  Future<void> completeDetailsStep(
+    WidgetTester tester, {
+    String bio = 'Hello there.',
+  }) async {
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'WhatsApp number'),
+      '+2348012345678',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'About you'),
+      bio,
+    );
+    final continueButton = find.widgetWithText(GradientButton, 'Continue');
+    await tester.ensureVisible(continueButton.first);
+    await tester.pumpAndSettle();
+    await tester.tap(continueButton.first);
+    await tester.pumpAndSettle();
+  }
+
+  /// Taps one of the six primary-service cards by its label.
+  Future<void> choose(WidgetTester tester, String label) async {
+    final target = find.text(label);
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
 
   /// Fills step one and advances to the WhatsApp/bio step.
   Future<void> completeAccountStep(WidgetTester tester) async {
@@ -70,18 +109,17 @@ void main() {
     // Saying so after the account exists would be saying so too late.
     await pumpJoin(tester, FakeAuthRepository());
 
-    expect(find.textContaining('no way to reset a forgotten password'),
-        findsOneWidget);
+    expect(
+      find.textContaining('no way to reset a forgotten password'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('will not advance past an invalid username', (tester) async {
     final repository = FakeAuthRepository();
     await pumpJoin(tester, repository);
 
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username'),
-      'x',
-    );
+    await tester.enterText(find.widgetWithText(TextFormField, 'Username'), 'x');
     final continueButton = find.widgetWithText(GradientButton, 'Continue');
     await tester.ensureVisible(continueButton.first);
     await tester.pumpAndSettle();
@@ -155,79 +193,56 @@ void main() {
     expect(repository.joinCalls, isEmpty);
   });
 
-  testWidgets('the submit button stays disabled until 18+ is confirmed', (
+  testWidgets('the submit button stays disabled until every answer is given', (
     tester,
   ) async {
     final repository = FakeAuthRepository();
     await pumpJoin(tester, repository, size: TestDevices.iPadPro);
     await completeAccountStep(tester);
+    await completeDetailsStep(tester);
 
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'WhatsApp number'),
-      '+2348012345678',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'About you'),
-      'Hello there.',
-    );
-    final continueButton = find.widgetWithText(GradientButton, 'Continue');
-    await tester.ensureVisible(continueButton.first);
-    await tester.pumpAndSettle();
-    await tester.tap(continueButton.first);
-    await tester.pumpAndSettle();
-
-    expect(find.text('What you offer'), findsOneWidget);
+    expect(find.text('What you are here for'), findsOneWidget);
 
     final submit = find.widgetWithText(GradientButton, 'Create my account');
     await tester.ensureVisible(submit);
     await tester.pumpAndSettle();
 
-    // Neither a service nor the tickbox yet.
+    // Nothing answered yet.
+    expect(
+      tester.widget<GradientButton>(submit).onPressed,
+      isNull,
+      reason: 'the route rejects a missing gender, service or isAdult',
+    );
+
+    // Gender alone is not enough: the route 400s without a primary service.
+    await choose(tester, 'A woman');
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    expect(tester.widget<GradientButton>(submit).onPressed, isNull);
+
+    // Gender and service, still without the tickbox.
+    await choose(tester, nonHookup.label);
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
     expect(
       tester.widget<GradientButton>(submit).onPressed,
       isNull,
       reason: 'the backend rejects isAdult != true outright',
     );
 
-    // Selecting a service alone is still not enough.
-    final chip = find.widgetWithText(FilterChip, firstService.label);
-    await tester.ensureVisible(chip);
-    await tester.pumpAndSettle();
-    await tester.tap(chip);
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(submit);
-    await tester.pumpAndSettle();
-    expect(tester.widget<GradientButton>(submit).onPressed, isNull);
-
     expect(repository.joinCalls, isEmpty);
   });
 
-  testWidgets('sends the six fields the backend actually reads', (
+  testWidgets('sends gender and the primary service, which the route demands', (
     tester,
   ) async {
     final repository = FakeAuthRepository();
     await pumpJoin(tester, repository, size: TestDevices.iPadPro);
     await completeAccountStep(tester);
+    await completeDetailsStep(tester, bio: 'Jollof and jazz.');
 
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'WhatsApp number'),
-      '+2348012345678',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'About you'),
-      'Jollof and jazz.',
-    );
-    final continueButton = find.widgetWithText(GradientButton, 'Continue');
-    await tester.ensureVisible(continueButton.first);
-    await tester.pumpAndSettle();
-    await tester.tap(continueButton.first);
-    await tester.pumpAndSettle();
-
-    final chip = find.widgetWithText(FilterChip, firstService.label);
-    await tester.ensureVisible(chip);
-    await tester.pumpAndSettle();
-    await tester.tap(chip);
-    await tester.pumpAndSettle();
+    await choose(tester, 'A woman');
+    await choose(tester, nonHookup.label);
 
     final tickbox = find.byType(CheckboxListTile);
     await tester.ensureVisible(tickbox);
@@ -246,8 +261,67 @@ void main() {
     expect(call['username'], 'zainab_lagos');
     expect(call['phone'], '+2348012345678');
     expect(call['bio'], 'Jollof and jazz.');
-    expect(call['services'], <String>[firstService.id]);
+    expect(call['gender'], 'WOMAN');
+    expect(call['primaryService'], nonHookup.id);
     expect(call['isAdult'], isTrue);
+  });
+
+  testWidgets('the hookup block appears only under that one choice', (
+    tester,
+  ) async {
+    await pumpJoin(tester, FakeAuthRepository(), size: TestDevices.iPadPro);
+    await completeAccountStep(tester);
+    await completeDetailsStep(tester);
+
+    await choose(tester, 'A woman');
+    await choose(tester, nonHookup.label);
+    expect(find.text('Your booking rates'), findsNothing);
+    expect(find.text('What you offer'), findsNothing);
+
+    await choose(tester, hookup.label);
+    expect(find.text('Your booking rates'), findsOneWidget);
+    expect(find.text('What you offer'), findsOneWidget);
+  });
+
+  testWidgets('switching away from hookup discards what it collected', (
+    tester,
+  ) async {
+    // Not cosmetic. Leaving the values in state would post an explicit service
+    // list alongside a primary service of "chat_buddy" — and although the
+    // server discards both in that case, a form that keeps hidden answers is a
+    // form that eventually submits one.
+    final repository = FakeAuthRepository();
+    await pumpJoin(tester, repository, size: TestDevices.iPadPro);
+    await completeAccountStep(tester);
+    await completeDetailsStep(tester);
+
+    await choose(tester, 'A woman');
+    await choose(tester, hookup.label);
+
+    final chip = find.byType(FilterChip).first;
+    await tester.ensureVisible(chip);
+    await tester.pumpAndSettle();
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+
+    await choose(tester, nonHookup.label);
+
+    final tickbox = find.byType(CheckboxListTile);
+    await tester.ensureVisible(tickbox);
+    await tester.pumpAndSettle();
+    await tester.tap(tickbox);
+    await tester.pumpAndSettle();
+
+    final submit = find.widgetWithText(GradientButton, 'Create my account');
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    final call = repository.joinCalls.single;
+    expect(call['primaryService'], nonHookup.id);
+    expect(call['hookupServices'], isEmpty);
+    expect(call['rates'], isEmpty);
   });
 
   testWidgets('never calls join before every step is satisfied', (

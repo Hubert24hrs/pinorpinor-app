@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pinorpinor_app/core/theme/app_theme.dart';
 import 'package:pinorpinor_app/data/models/profile.dart';
 import 'package:pinorpinor_app/shared/widgets/brand.dart';
+import 'package:pinorpinor_app/shared/widgets/primary_service_badge.dart';
 import 'package:pinorpinor_app/shared/widgets/profile_card.dart';
 
 import '../helpers/pump_app.dart';
@@ -16,17 +17,21 @@ void main() {
     bool redHot = false,
     bool featured = false,
     String? city,
+    String? primaryService,
+    Object? presence,
   }) => ProfileSummary.fromJson(<String, dynamic>{
     'id': 'u1',
     'username': name.toLowerCase(),
     'displayName': name,
     'age': age,
     'verificationStatus': verified ? 'VERIFIED' : 'NONE',
+    'presence': ?presence,
     'datingProfile': <String, dynamic>{
       'city': city,
       'isAvailableToday': availableToday,
       'isRedHot': redHot,
       'isFeatured': featured,
+      'primaryService': primaryService,
     },
   });
 
@@ -49,26 +54,123 @@ void main() {
       expect(find.byIcon(Icons.verified_rounded), findsOneWidget);
     });
 
-    testWidgets('shows the boosted badge for a red-hot profile', (
-      tester,
-    ) async {
-      await tester.pumpApp(ProfileCard(profile: profile(redHot: true)));
-      expect(find.text('Red hot'), findsOneWidget);
+    testWidgets('draws nothing at all over the photograph', (tester) async {
+      // The rule this card exists to hold since 2026-08-21: on a 3:4 portrait,
+      // anything in the top corner lands across the member's face, which is the
+      // one thing a member card exists to show. Every badge that used to sit
+      // there is either gone or in the bottom strip now, and this test fails if
+      // one comes back.
+      await tester.pumpApp(
+        ProfileCard(
+          profile: profile(
+            verified: true,
+            availableToday: true,
+            redHot: true,
+            featured: true,
+            primaryService: 'hookup',
+            presence: 'ONLINE',
+            city: 'Lagos',
+          ),
+        ),
+      );
+
+      final Size card = tester.getSize(find.byType(ProfileCard));
+      // Everything drawn must start below the halfway line. The website
+      // measured the top 54-74% of the image as clear; half is the conservative
+      // form of the same assertion and does not depend on font metrics.
+      final double faceLine =
+          tester.getTopLeft(find.byType(ProfileCard)).dy + card.height / 2;
+
+      for (final Finder drawn in <Finder>[
+        find.byType(PrimaryServiceBadge),
+        find.text('Zainab, 26'),
+        find.textContaining('Lagos'),
+        find.text('Available today'),
+      ]) {
+        expect(drawn, findsOneWidget);
+        expect(
+          tester.getTopLeft(drawn).dy,
+          greaterThan(faceLine),
+          reason: 'something is being drawn over her face',
+        );
+      }
     });
 
-    testWidgets('a featured profile shows New unless it is also boosted', (
+    testWidgets('the boost and new badges are gone from the card', (
       tester,
     ) async {
-      await tester.pumpApp(ProfileCard(profile: profile(featured: true)));
-      expect(find.text('New'), findsOneWidget);
-
-      // Both flags set: the paid boost wins, so the card does not stack two
-      // gold badges on top of each other.
+      // Deliberate, and mirrors the website. A boost buys placement in the
+      // discovery order, which the member still gets; neither badge told a
+      // visitor anything they could act on, and both were printed across a
+      // face to say it.
       await tester.pumpApp(
-        ProfileCard(profile: profile(featured: true, redHot: true)),
+        ProfileCard(profile: profile(redHot: true, featured: true)),
       );
+      expect(find.text('Red hot'), findsNothing);
       expect(find.text('New'), findsNothing);
-      expect(find.text('Red hot'), findsOneWidget);
+    });
+
+    testWidgets('shows the primary service badge, and only when there is one', (
+      tester,
+    ) async {
+      // Not merely an empty badge: the row is not built at all. An empty row
+      // still costs about 20px, which on a two-up 320px grid pushes the whole
+      // text block that much further up the photograph for every member who has
+      // not chosen -- the opposite of the point of the change.
+      await tester.pumpApp(ProfileCard(profile: profile()));
+      expect(find.byType(PrimaryServiceBadge), findsNothing);
+      expect(find.text('Hookup'), findsNothing);
+
+      await tester.pumpApp(
+        ProfileCard(profile: profile(primaryService: 'hookup')),
+      );
+      expect(find.text('Hookup'), findsOneWidget);
+    });
+
+    testWidgets('the presence dot follows the bucket, and AWAY draws none', (
+      tester,
+    ) async {
+      await tester.pumpApp(ProfileCard(profile: profile(presence: 'ONLINE')));
+      expect(
+        tester
+            .widgetList<PresenceDot>(find.byType(PresenceDot))
+            .single
+            .presence,
+        isNotNull,
+      );
+      expect(find.byType(SizedBox), findsWidgets);
+
+      // Switched off: null, not AWAY, and nothing rendered either way.
+      await tester.pumpApp(ProfileCard(profile: profile()));
+      expect(
+        tester
+            .widgetList<PresenceDot>(find.byType(PresenceDot))
+            .single
+            .presence,
+        isNull,
+      );
+    });
+
+    testWidgets('the WhatsApp glyph opens the profile, never a dialler', (
+      tester,
+    ) async {
+      // The member's number is not in this payload and must never be: a direct
+      // wa.me link here would publish every member's WhatsApp number to
+      // anonymous visitors and let a whole grid be harvested in one pass.
+      int contactTaps = 0;
+      await tester.pumpApp(
+        ProfileCard(
+          profile: profile(),
+          onTap: () {},
+          onContact: () => contactTaps++,
+        ),
+      );
+
+      final Finder glyph = find.byIcon(Icons.chat_rounded);
+      expect(glyph, findsOneWidget);
+      await tester.tap(glyph);
+      await tester.pumpAndSettle();
+      expect(contactTaps, 1);
     });
 
     testWidgets('shows the availability badge', (tester) async {

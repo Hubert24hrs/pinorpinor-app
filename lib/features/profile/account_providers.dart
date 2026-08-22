@@ -45,3 +45,16 @@ final ledgerProvider = FutureProvider.autoDispose<List<LedgerEntry>>((
 ) async {
   return ref.watch(creditsRepositoryProvider).ledger();
 });
+
+/// The member's referral code, link and results.
+///
+/// Separate from [walletProvider], which carries only a code and a count. This
+/// endpoint adds the share link and what the referrals actually earned, read
+/// from the ledger rather than multiplied out — a product would silently
+/// re-price everyone's history the first time the bonus changed.
+final referralSummaryProvider = FutureProvider.autoDispose<ReferralSummary>((
+  ref,
+) async {
+  ref.watch(authControllerProvider.select((auth) => auth.userId));
+  return ref.watch(creditsRepositoryProvider).referrals();
+});

@@ -44,6 +44,11 @@ class AppRoutes {
   static const live = '/live';
   static const videos = '/videos';
   static const locations = '/locations';
+
+  /// The website's "Get the App" page. Native here, because the website's
+  /// version exists to tell a browser visitor there is nothing to download —
+  /// which is not the question a member holding the app is asking.
+  static const getTheApp = '/app';
   static const section = '/section';
 
   // Settings

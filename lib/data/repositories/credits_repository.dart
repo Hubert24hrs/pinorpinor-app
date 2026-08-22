@@ -66,6 +66,14 @@ class CreditsRepository {
     );
   }
 
+  /// The member's referral code, link and results.
+  ///
+  /// The 500-credit payout has always worked; every part of it a member could
+  /// see was missing until the website shipped this endpoint on 2026-08-21.
+  /// Nothing here identifies who signed up — see [ReferralSummary].
+  Future<ReferralSummary> referrals() async =>
+      ReferralSummary.fromJson(await _api.getJson('/api/referrals'));
+
   /// Card checkout is intentionally unavailable from the app.
   ///
   /// Kept as a named, throwing method so the decision is visible where a future

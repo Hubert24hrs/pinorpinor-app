@@ -113,8 +113,12 @@ class AuthController extends StateNotifier<AuthState> {
     required String password,
     required String phone,
     required String bio,
-    required List<String> services,
+    required Gender gender,
+    required String primaryService,
     required bool isAdult,
+    List<String> services = const <String>[],
+    List<String> hookupServices = const <String>[],
+    Map<String, String> rates = const <String, String>{},
     String? referralCode,
   }) async {
     final result = await _repository.join(
@@ -122,17 +126,18 @@ class AuthController extends StateNotifier<AuthState> {
       password: password,
       phone: phone,
       bio: bio,
-      services: services,
+      gender: gender,
+      primaryService: primaryService,
       isAdult: isAdult,
+      services: services,
+      hookupServices: hookupServices,
+      rates: rates,
       referralCode: referralCode,
     );
 
     // The server normalises the username; sign in with what it stored rather
     // than with what was typed.
-    await signIn(
-      identifier: result.username ?? username,
-      password: password,
-    );
+    await signIn(identifier: result.username ?? username, password: password);
     return result;
   }
 

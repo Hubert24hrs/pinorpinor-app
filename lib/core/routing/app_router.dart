@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/app_info/get_the_app_screen.dart';
 import '../../features/auth/auth_controller.dart';
 import '../../features/auth/join_screen.dart';
 import '../../features/auth/login_screen.dart';
@@ -195,6 +196,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.videos,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const VideosScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.getTheApp,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const GetTheAppScreen(),
       ),
       GoRoute(
         path: AppRoutes.locations,

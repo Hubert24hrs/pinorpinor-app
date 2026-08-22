@@ -162,3 +162,51 @@ class LedgerEntry {
   static List<LedgerEntry> listFrom(Object? value) =>
       asMapList(value).map(LedgerEntry.fromJson).toList(growable: false);
 }
+
+/// The caller's own referral code, link and results, from `GET /api/referrals`.
+///
+/// ## What this deliberately does not carry
+///
+/// **No usernames, no display names, no join dates** for the people who signed
+/// up — only a count and a credit total, because that is all the endpoint
+/// returns. A referral list is a record of "this person knows that person", and
+/// on an adult platform that is exactly the join nobody consented to: someone
+/// who used a friend's link has not agreed to be shown back to that friend as a
+/// trophy. The count answers the only question the panel exists to answer, which
+/// is whether the link is working.
+///
+/// [creditsEarned] is summed from the ledger server-side, never
+/// `referrals * creditsPerReferral`: that would silently re-price everyone's
+/// history the first time the bonus changes.
+class ReferralSummary {
+  const ReferralSummary({
+    this.referralCode,
+    this.referralUrl,
+    this.referrals = 0,
+    this.creditsEarned = 0,
+    this.creditsPerReferral = 0,
+  });
+
+  static const empty = ReferralSummary();
+
+  final String? referralCode;
+
+  /// Built server-side from the real site origin, so a link copied here still
+  /// works when pasted somewhere permanent.
+  final String? referralUrl;
+
+  final int referrals;
+  final int creditsEarned;
+  final int creditsPerReferral;
+
+  bool get hasCode => (referralCode ?? '').isNotEmpty;
+
+  factory ReferralSummary.fromJson(Map<String, dynamic> json) =>
+      ReferralSummary(
+        referralCode: asStringOrNull(json['referralCode']),
+        referralUrl: asStringOrNull(json['referralUrl']),
+        referrals: asInt(json['referrals']),
+        creditsEarned: asInt(json['creditsEarned']),
+        creditsPerReferral: asInt(json['creditsPerReferral']),
+      );
+}

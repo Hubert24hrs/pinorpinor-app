@@ -182,7 +182,7 @@ class DiscoveryRepository {
     return ProfilePage.fromJson(json);
   }
 
-  /// The women rail used on the home screen. Only returns profiles that have at
+  /// The home rail. Only returns profiles that have at
   /// least one approved profile photo, so it never renders an empty card.
   Future<ProfilePage> ladies({
     DiscoveryFilters filters = DiscoveryFilters.none,
@@ -218,8 +218,8 @@ class DiscoveryRepository {
         'page': page,
         'limit': limit,
         if (strictlyOnline) 'strict': 'true',
-        if (countryCode != null && countryCode.isNotEmpty) 'country':
-            countryCode,
+        if (countryCode != null && countryCode.isNotEmpty)
+          'country': countryCode,
       },
     );
     return ProfilePage.fromJson(json);

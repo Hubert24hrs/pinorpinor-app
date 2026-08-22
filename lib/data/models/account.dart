@@ -1,5 +1,8 @@
+import '../../core/constants/hookup_services.dart';
+import '../../core/constants/primary_services.dart';
 import 'enums.dart';
 import 'json.dart';
+import 'live_sessions.dart';
 import 'media_item.dart';
 import 'rates.dart';
 
@@ -94,7 +97,9 @@ class Account {
       (profile.city ?? '').isNotEmpty,
       profile.countryCode != null,
       media.any((m) => m.mediaType == MediaType.profilePhoto),
-      profile.dateTypes.isNotEmpty,
+      // The primary service replaced the deprecated dateTypes column here: it
+      // is the one field a member must choose for their card to carry a badge.
+      profile.primaryService != null,
       emailVerified,
       !requiresPhoneVerification || phoneVerified,
     ];
@@ -165,11 +170,15 @@ class DatingProfile {
     this.relationshipIntent,
     this.dateTypes = const <String>[],
     this.services = const <String>[],
+    this.primaryService,
+    this.hookupServices = const <String>[],
+    this.liveSessions = MemberLiveSessions.empty,
     this.state,
     this.build,
     this.languages = const <String>[],
     this.rates = MemberRates.empty,
     this.isAvailableToday = false,
+    this.showOnline = true,
     this.isPublic = true,
     this.isDiscoverable = true,
     this.whatsappEnabled = true,
@@ -199,6 +208,20 @@ class DatingProfile {
   /// Catalogue ids from `lib/core/constants/services.dart`, never labels.
   final List<String> services;
 
+  /// The member's one primary service, or null when they have never chosen —
+  /// which is every account created before 2026-08-21. The editor must offer
+  /// "not chosen" as a real state rather than preselecting an option, because
+  /// saving a guess publishes a claim the member never made.
+  final String? primaryService;
+
+  /// The explicit list. Stored only while [primaryService] is Hookup; switching
+  /// away clears the column server-side rather than leaving it dormant.
+  final List<String> hookupServices;
+
+  /// Per-minute prices in **credits**. Never money — see
+  /// `lib/core/constants/live_sessions.dart`.
+  final MemberLiveSessions liveSessions;
+
   /// Subdivision within the country. Validated server-side against that
   /// country's list where one exists, free text where it does not.
   final String? state;
@@ -213,7 +236,18 @@ class DatingProfile {
 
   final bool isAvailableToday;
 
-  /// Men's profiles are created private (`isPublic: false`) and never listed.
+  /// The member's presence switch.
+  ///
+  /// False withholds her presence — she disappears from "Online now" and from
+  /// the live strip — **without** hiding her profile, which `isDiscoverable`
+  /// would. Before this existed, going dark meant going undiscoverable, and
+  /// publishing "she is online right now" to anonymous visitors tells a stranger
+  /// when she is awake and when she is alone.
+  final bool showOnline;
+
+  /// Whether the profile is listed publicly. Men's profiles are visible to
+  /// signed-in members only, and that rule lives in `resolveVisibleGenders()`
+  /// server-side — not in this flag.
   final bool isPublic;
 
   final bool isDiscoverable;
@@ -228,6 +262,15 @@ class DatingProfile {
   final DateTime? featuredUntil;
   final int viewCount;
 
+  /// Whether the hookup booking block and the explicit list apply to this
+  /// profile. The editor renders them on this answer; the server re-derives it
+  /// from the stored row on every write.
+  bool get offersHookup => primaryService == kHookupId;
+
+  /// The catalogue entry for [primaryService], or null when unchosen.
+  PrimaryServiceOption? get primaryServiceOption =>
+      primaryServiceFor(primaryService);
+
   factory DatingProfile.fromJson(Map<String, dynamic> json) => DatingProfile(
     bio: asStringOrNull(json['bio']),
     tagline: asStringOrNull(json['tagline']),
@@ -240,11 +283,18 @@ class DatingProfile {
     relationshipIntent: RelationshipIntent.parse(json['relationshipIntent']),
     dateTypes: asStringList(json['dateTypes']),
     services: asStringList(json['services']),
+    primaryService: sanitizePrimaryService(json['primaryService']),
+    hookupServices: sanitizeHookupServices(
+      asStringList(json['hookupServices']),
+      offersHookup: asStringOrNull(json['primaryService']) == kHookupId,
+    ),
+    liveSessions: MemberLiveSessions.fromProfileJson(json),
     state: asStringOrNull(json['state']),
     build: asStringOrNull(json['build']),
     languages: asStringList(json['languages']),
     rates: MemberRates.fromProfileJson(json),
     isAvailableToday: asBool(json['isAvailableToday']),
+    showOnline: asBool(json['showOnline'], fallback: true),
     isPublic: asBool(json['isPublic'], fallback: true),
     isDiscoverable: asBool(json['isDiscoverable'], fallback: true),
     whatsappEnabled: asBool(json['whatsappEnabled'], fallback: true),

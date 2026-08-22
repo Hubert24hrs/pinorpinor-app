@@ -7,6 +7,7 @@ import '../data/repositories/discovery_repository.dart';
 import '../data/repositories/media_repository.dart';
 import '../data/repositories/messaging_repository.dart';
 import '../data/repositories/notifications_repository.dart';
+import '../data/repositories/presence_repository.dart';
 import '../data/repositories/profile_repository.dart';
 import '../data/repositories/safety_repository.dart';
 import '../data/repositories/dates_repository.dart';
@@ -58,6 +59,10 @@ final notificationsRepositoryProvider = Provider<NotificationsRepository>(
 
 final contactRepositoryProvider = Provider<ContactRepository>(
   (ref) => ContactRepository(ref.watch(apiClientProvider)),
+);
+
+final presenceRepositoryProvider = Provider<PresenceRepository>(
+  (ref) => PresenceRepository(ref.watch(apiClientProvider)),
 );
 
 final safetyRepositoryProvider = Provider<SafetyRepository>(

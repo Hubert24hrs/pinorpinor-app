@@ -6,45 +6,57 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
-import '../../core/constants/services.dart';
+import '../../core/constants/countries.dart';
+import '../../core/constants/primary_services.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/providers.dart';
 import '../../core/routing/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
+import '../../core/utils/money.dart';
 import '../../core/utils/validators.dart';
+import '../../data/models/enums.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../profile/hookup_details_form.dart';
+import '../profile/primary_service_picker.dart';
 import '../../shared/utils/legal_links.dart';
 import '../../shared/widgets/brand.dart';
 import 'auth_controller.dart';
 
 /// Registration, reproducing `/join` on the website.
 ///
-/// **Six fields.** The route was rebuilt on 2026-08-14 down to username,
-/// password, WhatsApp number, bio, services and an 18+ confirmation. Email,
-/// date of birth, gender, country and display name are no longer collected —
-/// the previous version of this screen asked for all of them, and the four it
-/// sent as required are not read by the endpoint any more.
-///
-/// The rules it enforces are the backend's, not invented here:
+/// The rules it enforces are the backend's, not invented here.
 ///
 ///   * **18+ is a tickbox, not a date of birth.** `birthDate` stays null, so
 ///     nothing downstream may assume an age exists. It is an assertion by the
 ///     member; the record that the question was asked and answered is the whole
 ///     of what it provides.
-///   * **A WhatsApp number is mandatory and must be E.164.** It is also what
-///     the country is derived from, server-side, and discovery scopes on
-///     country — so a number that does not resolve leaves the member
-///     discoverable by nobody until they set a location in Edit Profile.
-///   * **At least one service** must be selected, whitelisted against the
-///     catalogue in `lib/core/constants/services.dart`.
+///   * **A WhatsApp number is mandatory and must be E.164.** It is also what the
+///     country is derived from, server-side, and discovery scopes on country -
+///     so a number that does not resolve leaves the member discoverable by
+///     nobody until they set a location in Edit Profile.
+///   * **Gender is asked again, and it is load-bearing.** It was dropped from
+///     this form in August and hardcoded to WOMAN server-side, because only
+///     women could list. Both are accepted since 2026-08-21. The answer is not
+///     demographic: `role` and `interestedIn` are derived from it and discovery
+///     filters on it, so a wrong answer here means a profile that looks
+///     perfectly fine to its owner and appears in nobody else's browsing.
+///   * **One primary service, required.** Six options, exactly one choice. It is
+///     the badge on the member's card, and it decides whether the hookup block
+///     is stored at all.
 ///   * **Username is unique, lowercase and format-checked** in three layers;
 ///     the live check here is the advisory one.
 ///
+/// **The activity catalogue is no longer asked for here.** The website moved it
+/// to Edit Profile on 2026-08-21 so signup stays short, and the route made
+/// `services` optional in the same commit. Asking for both a required single
+/// choice and 31 optional chips on the same screen is how a signup form gets
+/// abandoned.
+///
 /// **There is no password reset for accounts made here.** No address is
-/// collected, and `/api/forgot-password` looks members up by address. The
-/// screen says so plainly before the member commits, because the alternative is
+/// collected, and `/api/forgot-password` looks members up by address. The screen
+/// says so plainly before the member commits, because the alternative is
 /// discovering it at the moment it can no longer be fixed.
 class JoinScreen extends ConsumerStatefulWidget {
   const JoinScreen({super.key});
@@ -65,8 +77,15 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
   final _bioController = TextEditingController();
   final _referralController = TextEditingController();
 
-  final Set<String> _services = <String>{};
+  Gender? _gender;
+  String? _primaryService;
+  final List<String> _hookupServices = <String>[];
+  final Map<String, String> _rates = <String, String>{};
   bool _isAdult = false;
+
+  /// Whether the hookup branch is mounted. Named rather than compared inline at
+  /// four call sites, for the same reason the website names `HOOKUP_ID`.
+  bool get _wantsHookup => offersHookup(_primaryService);
 
   int _step = 0;
   bool _submitting = false;
@@ -83,11 +102,22 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
   void initState() {
     super.initState();
     _usernameController.addListener(_onUsernameChanged);
+    // The rate boxes are denominated in the currency of the number being typed,
+    // resolved exactly as the server will resolve it. Without this a member
+    // enters a figure against a placeholder currency and finds out afterwards
+    // what it was actually stored as.
+    _phoneController.addListener(_onPhoneChanged);
+  }
+
+  void _onPhoneChanged() {
+    if (!_wantsHookup) return;
+    setState(() {});
   }
 
   @override
   void dispose() {
     _usernameDebounce?.cancel();
+    _phoneController.removeListener(_onPhoneChanged);
     _pageController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -146,8 +176,14 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
     if (_submitting) return;
     FocusScope.of(context).unfocus();
 
-    if (_services.isEmpty) {
-      setState(() => _error = 'Select at least one service.');
+    if (_gender == null) {
+      setState(
+        () => _error = 'Tell us whether you are joining as a woman or a man.',
+      );
+      return;
+    }
+    if (_primaryService == null) {
+      setState(() => _error = 'Choose the one service you are here for.');
       return;
     }
     if (!_isAdult) {
@@ -171,8 +207,14 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
             password: _passwordController.text,
             phone: _phoneController.text,
             bio: _bioController.text,
-            services: _services.toList(),
+            gender: _gender!,
+            primaryService: _primaryService!,
             isAdult: _isAdult,
+            // Sent only under the hookup badge. The repository gates them again
+            // and so does the route; this is the first of the three, and the
+            // one that stops a form's leftover state reaching the wire at all.
+            hookupServices: _wantsHookup ? _hookupServices : const <String>[],
+            rates: _wantsHookup ? _rates : const <String, String>{},
             referralCode: _referralController.text,
           );
 
@@ -190,6 +232,8 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
           _goToStep(0);
         } else if (error.field == 'phone' || error.field == 'bio') {
           _goToStep(1);
+        } else if (error.field == 'gender' || error.field == 'primaryService') {
+          _goToStep(2);
         }
       });
     } finally {
@@ -237,7 +281,7 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
               children: <Widget>[
                 _buildAccountStep(),
                 _buildDetailsStep(),
-                _buildServicesStep(),
+                _buildServiceStep(),
               ],
             ),
           ),
@@ -514,22 +558,27 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
     );
   }
 
-  // ── Step 3 — services and the 18+ confirmation ────────────────────────
+  // -- Step 3: gender, the one service, and the 18+ confirmation --------
 
-  Widget _buildServicesStep() {
+  Widget _buildServiceStep() {
     final theme = Theme.of(context);
-    final groups = servicesByGroup();
+    // Resolved from what has been typed so far, the same way the server will
+    // resolve it. Null - an unrecognised dialling code - falls back to the
+    // default currency rather than guessing a country.
+    final String currencyCode = resolveCurrency(
+      countryCode: countryFromPhone(_phoneController.text),
+    ).code;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text('What you offer', style: theme.textTheme.headlineSmall),
+          Text('What you are here for', style: theme.textTheme.headlineSmall),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Choose at least one. You can change these at any time from your '
-            'profile.',
+            'Two questions, and you are done. You can change both at any time '
+            'from your profile.',
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -539,32 +588,77 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
             const SizedBox(height: AppSpacing.lg),
           ],
 
-          for (final group in groups) ...<Widget>[
-            Text(group.group.label, style: theme.textTheme.titleSmall),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: <Widget>[
-                for (final option in group.options)
-                  FilterChip(
-                    label: Text(option.label),
-                    selected: _services.contains(option.id),
-                    onSelected: (selected) => setState(() {
-                      if (selected) {
-                        _services.add(option.id);
-                      } else {
-                        _services.remove(option.id);
-                      }
+          // Gender. Not decoration: discovery filters on it, so a wrong answer
+          // here leaves a profile that looks right to its owner and appears in
+          // nobody else's browsing.
+          Text('I am joining as', style: theme.textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: <Widget>[
+              for (final Gender option in Gender.values) ...<Widget>[
+                Expanded(
+                  child: _ChoiceCard(
+                    label: option == Gender.woman ? 'A woman' : 'A man',
+                    selected: _gender == option,
+                    onTap: () => setState(() {
+                      _gender = option;
                       _error = null;
                     }),
                   ),
+                ),
+                if (option != Gender.values.last)
+                  const SizedBox(width: AppSpacing.sm),
               ],
-            ),
+            ],
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
+          Text('What are you here for?', style: theme.textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Pick one. This is the badge people see on your card.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          PrimaryServicePicker(
+            value: _primaryService,
+            onChanged: (id) => setState(() {
+              // Choosing something else discards whatever was typed into the
+              // hookup branch, rather than keeping it in state where it would
+              // eventually be submitted alongside a badge that contradicts it.
+              if (!offersHookup(id)) {
+                _hookupServices.clear();
+                _rates.clear();
+              }
+              _primaryService = id;
+              _error = null;
+            }),
+          ),
+
+          if (_wantsHookup) ...<Widget>[
             const SizedBox(height: AppSpacing.lg),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.bgSecondary,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: HookupDetailsForm(
+                rates: _rates,
+                onRateChanged: (field, value) => _rates[field] = value,
+                services: _hookupServices,
+                onServicesChanged: (next) => setState(() {
+                  _hookupServices
+                    ..clear()
+                    ..addAll(next);
+                }),
+                currencyCode: currencyCode,
+              ),
+            ),
           ],
 
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.lg),
           CheckboxListTile(
             value: _isAdult,
             onChanged: (value) => setState(() {
@@ -600,7 +694,9 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
           GradientButton(
             label: 'Create my account',
             isLoading: _submitting,
-            onPressed: _isAdult && _services.isNotEmpty ? _submit : null,
+            onPressed: _isAdult && _gender != null && _primaryService != null
+                ? _submit
+                : null,
           ),
           const SizedBox(height: AppSpacing.xl),
         ],
@@ -689,6 +785,50 @@ class _NoticeCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A two-up radio card, for the gender question.
+///
+/// A pair of cards rather than a dropdown or a Radio row: it is two options, the
+/// answer is load-bearing, and both need to be visible without a tap. The 44px
+/// floor is met by the padding.
+class _ChoiceCard extends StatelessWidget {
+  const _ChoiceCard({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.badgeRoseBg : AppColors.bgSecondary,
+          border: Border.all(
+            color: selected ? AppColors.rose : AppColors.border,
+            width: selected ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: selected ? AppColors.rose : AppColors.textMain,
+          ),
+        ),
       ),
     );
   }

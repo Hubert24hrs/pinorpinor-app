@@ -65,14 +65,40 @@ void main() {
       expect(profile.presence, Presence.online);
     });
 
-    test('a response without presence reads as away', () {
+    test('a response without presence carries no bucket at all', () {
+      // Null rather than AWAY, and the difference is load-bearing: since
+      // 2026-08-21 a member can switch presence off, and publicPresence() then
+      // sends null. AWAY is a claim about her ("not here in a week"); null is
+      // the absence of a claim, which is what she asked for. Collapsing the two
+      // would put words in her mouth.
       final profile = ProfileSummary.fromJson(<String, dynamic>{
         'id': 'u1',
         'username': 'zainab',
       });
 
+      expect(profile.presence, isNull);
+    });
+
+    test('an explicit AWAY is kept, and renders no dot', () {
+      final profile = ProfileSummary.fromJson(<String, dynamic>{
+        'id': 'u1',
+        'username': 'zainab',
+        'presence': 'AWAY',
+      });
+
       expect(profile.presence, Presence.away);
-      expect(profile.presence.isOnlineNow, isFalse);
+      expect(profile.presence!.isOnlineNow, isFalse);
+      expect(profile.presence!.showsDot, isFalse);
+    });
+
+    test('every other bucket earns a dot', () {
+      for (final Presence p in <Presence>[
+        Presence.online,
+        Presence.today,
+        Presence.thisWeek,
+      ]) {
+        expect(p.showsDot, isTrue, reason: p.name);
+      }
     });
   });
 }

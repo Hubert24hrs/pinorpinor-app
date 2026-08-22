@@ -187,13 +187,31 @@ class _CreditsBody extends ConsumerWidget {
             packages: packages.valueOrNull ?? const <CreditPackage>[],
           ),
 
-          if (wallet.referralCode != null) ...<Widget>[
-            const SizedBox(height: AppSpacing.xl),
-            _ReferralCard(
-              code: wallet.referralCode!,
-              count: wallet.referralCount,
-            ),
-          ],
+          // Read from /api/referrals rather than from the wallet, which carries
+          // only a code and a count. The wallet's copy is the fallback so the
+          // panel still renders if that call fails.
+          ...ref
+              .watch(referralSummaryProvider)
+              .when(
+                loading: () => const <Widget>[],
+                error: (_, _) => <Widget>[
+                  if (wallet.referralCode != null) ...<Widget>[
+                    const SizedBox(height: AppSpacing.xl),
+                    _ReferralCard(
+                      summary: ReferralSummary(
+                        referralCode: wallet.referralCode,
+                        referrals: wallet.referralCount,
+                      ),
+                    ),
+                  ],
+                ],
+                data: (summary) => <Widget>[
+                  if (summary.hasCode) ...<Widget>[
+                    const SizedBox(height: AppSpacing.xl),
+                    _ReferralCard(summary: summary),
+                  ],
+                ],
+              ),
 
           const SizedBox(height: AppSpacing.xl),
           Text(
@@ -455,14 +473,26 @@ class _BuyCreditsCard extends StatelessWidget {
   }
 }
 
+/// The referral panel.
+///
+/// ## What it deliberately cannot show
+///
+/// **Who signed up.** The endpoint returns a count and a credit total and no
+/// usernames, no names and no join dates, because a referral list is a record of
+/// "this person knows that person" — and on an adult platform that is exactly
+/// the join nobody consented to. Someone who used a friend's link has not agreed
+/// to be shown back to that friend as a trophy. The count answers the only
+/// question this panel exists to answer, which is whether the link works.
 class _ReferralCard extends StatelessWidget {
-  const _ReferralCard({required this.code, required this.count});
+  const _ReferralCard({required this.summary});
 
-  final String code;
-  final int count;
+  final ReferralSummary summary;
 
   @override
   Widget build(BuildContext context) {
+    final int count = summary.referrals;
+    final String code = summary.referralCode ?? '';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -476,11 +506,27 @@ class _ReferralCard extends StatelessWidget {
           Text('Invite friends', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'They enter your code when joining, and you both receive bonus '
-            'credits. $count ${count == 1 ? 'person has' : 'people have'} '
-            'joined with yours.',
+            summary.creditsPerReferral > 0
+                ? 'They enter your code when joining, and you both receive '
+                      '${summary.creditsPerReferral} credits. '
+                      '$count ${count == 1 ? 'person has' : 'people have'} '
+                      'joined with yours.'
+                : 'They enter your code when joining, and you both receive '
+                      'bonus credits. '
+                      '$count ${count == 1 ? 'person has' : 'people have'} '
+                      'joined with yours.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          if (summary.creditsEarned > 0) ...<Widget>[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              // Read from the ledger server-side: what was actually paid at the
+              // time, not this count multiplied by today's bonus.
+              'You have earned ${summary.creditsEarned} credits from '
+              'referrals.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           Row(
             children: <Widget>[
@@ -522,6 +568,26 @@ class _ReferralCard extends StatelessWidget {
               ),
             ],
           ),
+          if (summary.referralUrl != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            // The link is built server-side from the real site origin, so a
+            // copy pasted somewhere permanent still works. Never rebuilt here
+            // from a local guess at the host.
+            OutlinedButton.icon(
+              icon: const Icon(Icons.link_rounded, size: 18),
+              label: const Text('Copy invite link'),
+              onPressed: () async {
+                await Clipboard.setData(
+                  ClipboardData(text: summary.referralUrl!),
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invite link copied.')),
+                  );
+                }
+              },
+            ),
+          ],
         ],
       ),
     );

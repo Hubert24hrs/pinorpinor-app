@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../core/constants/hookup_services.dart';
+import '../../core/constants/primary_services.dart';
 import '../../core/constants/services.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
@@ -7,6 +9,7 @@ import '../../core/network/session_store.dart';
 import '../../core/utils/validators.dart';
 import '../models/enums.dart';
 import '../models/json.dart';
+import '../models/rates.dart';
 
 /// Authentication against the website's NextAuth credentials provider.
 ///
@@ -153,37 +156,68 @@ class AuthRepository {
 
   /// Creates a member account through `/api/member/join`.
   ///
-  /// **Six fields, and no email address.** The route was rebuilt on
-  /// 2026-08-14 (migration `20260814000000_emailless_signup`) down to
-  /// username, password, WhatsApp number, bio, services and an 18+
-  /// confirmation. Email, date of birth, gender, country and display name were
-  /// all removed from it — sending them is harmless but pointless, and the
-  /// four fields this app used to send as *required* are simply not read any
-  /// more.
+  /// **No email address.** The route was rebuilt on 2026-08-14 (migration
+  /// `20260814000000_emailless_signup`) and extended again on 2026-08-21
+  /// (`20260821000000_primary_service_and_referrals`). Email, date of birth,
+  /// country and display name are not read at all.
   ///
-  /// Three consequences worth knowing before changing anything here:
+  /// ## Four things the route rejects the request without
   ///
-  /// - **`isAdult` must be `true`** or the route rejects the request outright.
-  ///   It is an assertion by the member, not a verification by us; its whole
-  ///   value is that there is a record the question was asked and answered.
+  /// - **`isAdult` must be `true`.** An assertion by the member, not a
+  ///   verification by us; its whole value is that there is a record the
+  ///   question was asked and answered.
+  /// - **`gender` must be `WOMAN` or `MAN`.** Required since 2026-08-21, when
+  ///   men could register for the first time. The route maps it through a
+  ///   closed server-side table to `role` and `interestedIn` rather than
+  ///   trusting the wire, because discovery filters on gender and an unexpected
+  ///   value would put an account somewhere none of those queries look. Sending
+  ///   nothing - which this app did until this was fixed - is a 400 every time,
+  ///   and a 400 on registration is indistinguishable from a broken app.
+  /// - **`primaryService` must be one of the six ids** in
+  ///   `lib/core/constants/primary_services.dart`. Exactly one, required and
+  ///   whitelisted: it is the badge on the member's card and it decides whether
+  ///   the hookup block below is stored at all, so an unrecognised value is
+  ///   rejected rather than dropped.
+  /// - **`username` and `password`**, as before.
+  ///
+  /// ## The hookup gate
+  ///
+  /// `hookupServices` and `rates` are accepted **only** alongside
+  /// `primaryService: 'hookup'`. Posting them under anything else stores an
+  /// empty list and null rates with a 200 - the request is answerable, and the
+  /// stored row simply must never contradict the badge on the card. This client
+  /// applies the same gate before sending, so nothing left behind in a form's
+  /// state can leak into the payload.
+  ///
+  /// `services` is optional now: registration asks only for the one primary
+  /// service, and the 31-entry activity catalogue is offered in Edit Profile
+  /// instead, which is what keeps signup short.
+  ///
+  /// Two consequences unchanged from 2026-08-14:
+  ///
   /// - **There is no password-reset path for accounts created this way.**
-  ///   `/api/forgot-password` looks a member up by address and there is
-  ///   nothing to look up, so a forgotten password is a lost account. The join
-  ///   screen says so before the member commits.
+  ///   `/api/forgot-password` looks a member up by address and there is nothing
+  ///   to look up, so a forgotten password is a lost account. The join screen
+  ///   says so before the member commits.
   /// - **The country comes from the phone number**, resolved server-side by
-  ///   `countryFromPhone`. Discovery scopes on `countryCode`, so a member
-  ///   whose number does not resolve is discoverable by nobody until they set
-  ///   a location in Edit Profile.
+  ///   `countryFromPhone`. Discovery scopes on `countryCode`, so a member whose
+  ///   number does not resolve is discoverable by nobody until they set a
+  ///   location in Edit Profile.
   ///
-  /// Gender is forced to `WOMAN` server-side. This route only creates the
-  /// listing accounts; it is not a general registration endpoint.
+  /// **Rates are sent in MAJOR units, as typed.** `parseRateInput` converts them
+  /// server-side against the currency the phone number resolves to; converting
+  /// here as well is how a rate ends up stored a hundred times out.
   Future<JoinResult> join({
     required String username,
     required String password,
     required String phone,
     required String bio,
-    required List<String> services,
+    required Gender gender,
+    required String primaryService,
     required bool isAdult,
+    List<String> services = const <String>[],
+    List<String> hookupServices = const <String>[],
+    Map<String, String> rates = const <String, String>{},
     String? referralCode,
   }) async {
     // Checked here as well as server-side so the member is not told "you must
@@ -197,17 +231,29 @@ class AuthRepository {
       );
     }
 
-    // Whitelisted against the catalogue before sending. The backend does this
-    // too — doing it here means an id retired since the screen was built is
-    // dropped quietly rather than failing the whole registration.
+    // Whitelisted before sending, same as the primary service below. The
+    // backend does this too - doing it here means an id retired since the
+    // screen was built is dropped quietly rather than failing the registration.
     final List<String> cleanServices = sanitizeServiceIds(services);
-    if (cleanServices.isEmpty) {
+
+    final String? cleanPrimary = sanitizePrimaryService(primaryService);
+    if (cleanPrimary == null) {
       throw const ApiException(
         kind: ApiErrorKind.validation,
-        message: 'Select at least one service.',
-        field: 'services',
+        message: 'Choose the one service you are here for.',
+        field: 'primaryService',
       );
     }
+
+    // The gate, applied on the way out. The server enforces it independently in
+    // four places, so a list sent under a non-hookup badge would simply be
+    // discarded - but a client that keeps hidden answers is a client that
+    // eventually submits one.
+    final bool wantsHookup = offersHookup(cleanPrimary);
+    final List<String> cleanHookupServices = sanitizeHookupServices(
+      hookupServices,
+      offersHookup: wantsHookup,
+    );
 
     final json = await _api.postJson(
       '/api/member/join',
@@ -216,7 +262,11 @@ class AuthRepository {
         'password': password,
         'phone': phone.trim(),
         'bio': bio.trim(),
+        'gender': gender.wire,
+        'primaryService': cleanPrimary,
         'services': cleanServices,
+        'hookupServices': cleanHookupServices,
+        if (wantsHookup) 'rates': MemberRates.patchBody(rates),
         'isAdult': true,
         if (referralCode != null && referralCode.trim().isNotEmpty)
           'referralCode': referralCode.trim().toUpperCase(),

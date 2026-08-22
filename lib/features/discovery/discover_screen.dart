@@ -19,8 +19,13 @@ import '../shell/app_drawer.dart';
 ///
 /// Two visibility rules are worth stating because they are invisible in the UI
 /// and enforced entirely on the server:
-///   * **Anonymous callers only ever see women.** Men's profiles are private,
-///     and the API hard-limits a signed-out caller regardless of any parameter.
+///   * **A signed-out visitor only ever sees women.** `resolveVisibleGenders()`
+///     hard-limits an anonymous caller regardless of any parameter. A signed-in
+///     member sees whichever genders their own stored `interestedIn` allows,
+///     read from the database and never from the request — so men, who have
+///     been able to register since 2026-08-21, appear for signed-in members
+///     only. There is nothing for this screen to filter: the answer arrives
+///     already scoped.
 ///   * **A signed-in member is pinned to their own country.** The country
 ///     control below is therefore only offered to visitors — for a member it
 ///     would be a control that does nothing.
@@ -298,9 +303,9 @@ class _ActiveFilterChips extends ConsumerWidget {
           for (final filter in active)
             InputChip(
               label: Text(filter.label),
-              onDeleted: () => ref
-                  .read(discoveryFiltersProvider.notifier)
-                  .state = filter.clear(),
+              onDeleted: () =>
+                  ref.read(discoveryFiltersProvider.notifier).state = filter
+                      .clear(),
               deleteIcon: const Icon(Icons.close_rounded, size: 15),
               deleteButtonTooltipMessage: 'Remove ${filter.label}',
               visualDensity: VisualDensity.compact,
@@ -317,14 +322,12 @@ class _ActiveFilterChips extends ConsumerWidget {
           // Only worth offering once removing them one at a time is tedious.
           if (active.length > 1)
             TextButton(
-              onPressed: () => ref
-                  .read(discoveryFiltersProvider.notifier)
-                  .state = DiscoveryFilters.none,
+              onPressed: () =>
+                  ref.read(discoveryFiltersProvider.notifier).state =
+                      DiscoveryFilters.none,
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
               ),
               child: const Text('Clear all'),
             ),
@@ -534,7 +537,10 @@ class _FilterSheetState extends State<_FilterSheet> {
               ),
 
               const SizedBox(height: AppSpacing.lg),
-              Text('Last active', style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                'Last active',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const SizedBox(height: AppSpacing.sm),
               Wrap(
                 spacing: AppSpacing.sm,

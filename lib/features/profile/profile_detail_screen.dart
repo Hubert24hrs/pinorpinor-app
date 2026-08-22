@@ -15,7 +15,12 @@ import '../../data/models/media_item.dart';
 import '../../data/models/profile.dart';
 import '../../data/repositories/whatsapp_repository.dart';
 import '../../shared/utils/legal_links.dart';
+import '../../core/constants/hookup_services.dart';
+import '../../data/models/presence.dart';
+import '../../data/models/live_sessions.dart';
 import '../../shared/widgets/brand.dart';
+import '../../shared/widgets/primary_service_badge.dart';
+import '../auth/login_screen.dart' show InlineNotice;
 import '../../shared/widgets/profile_image.dart';
 import '../../shared/widgets/states.dart';
 import '../auth/auth_controller.dart';
@@ -165,7 +170,9 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                 authControllerProvider.select((state) => state.isSignedIn),
               ),
               onRequiresSignIn: () => unawaited(
-                context.push('${AppRoutes.login}?redirect=${AppRoutes.favorites}'),
+                context.push(
+                  '${AppRoutes.login}?redirect=${AppRoutes.favorites}',
+                ),
               ),
             ),
             IconButton(
@@ -240,10 +247,23 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                   ],
                 ),
 
+                // The one thing she is here for, above the rest. Absent for a
+                // member who joined before 2026-08-21 and has not chosen, and
+                // absent is the correct rendering -- the badge is a claim, and
+                // an unmade claim must not be guessed at.
+                if (profile.primaryService != null) ...<Widget>[
+                  const SizedBox(height: AppSpacing.md),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: PrimaryServiceBadge(id: profile.primaryService),
+                  ),
+                ],
+
                 const SizedBox(height: AppSpacing.md),
                 Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: <Widget>[
                     if (profile.isVerified) const AppBadge.verified(),
                     if (profile.isAvailableToday)
@@ -251,6 +271,12 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                     if (profile.isRedHot) const AppBadge.boosted(),
                     if (profile.placeLabel != null)
                       AppBadge.location(label: profile.placeLabel!),
+                    // Presence, as the label rather than the dot: there is room
+                    // for it here, and unlike on a card it is not competing with
+                    // a photograph. Null -- her own switch -- renders nothing at
+                    // all rather than "Away".
+                    if (profile.presence != null && profile.presence!.showsDot)
+                      _PresenceChip(presence: profile.presence!),
                   ],
                 ),
 
@@ -321,6 +347,34 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                   ),
                 ],
 
+                // The explicit list, gated on Hookup exactly as the server
+                // gates it. hookupServiceOptions returns nothing under any
+                // other badge, so this section cannot be rendered by a payload
+                // that should not have carried the column at all -- which is
+                // the failure the website had in August, when the screens
+                // stopped showing this list and four endpoints kept publishing
+                // it as JSON.
+                if (profile.hookupServiceOptions.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: AppSpacing.xxl),
+                  const _SectionTitle(title: 'What she offers'),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: <Widget>[
+                      // Only what she selected, never the catalogue with the
+                      // rest greyed out. On this list in particular, showing
+                      // what someone declined beside what they offer publishes
+                      // a far more specific claim than they agreed to.
+                      for (final HookupServiceOption option
+                          in profile.hookupServiceOptions)
+                        Chip(label: Text(option.label)),
+                    ],
+                  ),
+                ],
+
+                ..._buildLiveSessions(profile),
+
                 ..._buildRates(profile),
 
                 ..._buildDetails(profile),
@@ -347,6 +401,75 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
         ),
       ],
     );
+  }
+
+  /// Per-minute session prices, in **credits**.
+  ///
+  /// Deliberately separate from the rates block below, and never formatted with
+  /// `formatMoney`: these are the platform's own unit with no currency, and
+  /// dividing 50 credits by a currency's minor unit would publish "0.50".
+  ///
+  /// The note under the table is not optional. Nothing in this app or on the
+  /// website can start one of these sessions or charge for one, so a price
+  /// shown with no explanation reads as a service that can be bought right now.
+  List<Widget> _buildLiveSessions(ProfileSummary profile) {
+    final List<LiveSessionRow> rows = profile.liveSessions.rows;
+    if (rows.isEmpty) return const <Widget>[];
+
+    return <Widget>[
+      const SizedBox(height: AppSpacing.xxl),
+      const _SectionTitle(title: 'Live sessions'),
+      const SizedBox(height: AppSpacing.sm),
+      for (final LiveSessionRow row in rows)
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      row.option.label,
+                      style: const TextStyle(
+                        fontFamily: AppTheme.sansFamily,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMain,
+                      ),
+                    ),
+                    Text(
+                      row.option.description,
+                      style: const TextStyle(
+                        fontFamily: AppTheme.sansFamily,
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                row.priceLabel,
+                style: const TextStyle(
+                  fontFamily: AppTheme.sansFamily,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.rose,
+                ),
+              ),
+            ],
+          ),
+        ),
+      const SizedBox(height: AppSpacing.xs),
+      const InlineNotice.info(
+        message:
+            'Live sessions are not available yet. These are the prices this '
+            'member has set for when they are; nothing can be started or '
+            'charged today.',
+      ),
+    ];
   }
 
   /// The member's published rates.
@@ -1021,6 +1144,52 @@ class _CircularIcon extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: Icon(icon, size: 19, color: Colors.white),
+    );
+  }
+}
+
+/// The presence bucket as a chip, for the profile header.
+///
+/// Never a timestamp, and never rendered for [Presence.away] or for a member who
+/// switched presence off -- the caller checks both, and this widget takes a
+/// non-null bucket so there is one place that decision is made.
+class _PresenceChip extends StatelessWidget {
+  const _PresenceChip({required this.presence});
+
+  final Presence presence;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.bgMuted,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: presence.dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            presence.label,
+            style: const TextStyle(
+              fontFamily: AppTheme.sansFamily,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

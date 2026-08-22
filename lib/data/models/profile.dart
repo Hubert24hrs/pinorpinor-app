@@ -1,6 +1,9 @@
+import '../../core/constants/hookup_services.dart';
+import '../../core/constants/primary_services.dart';
 import '../../core/constants/services.dart';
 import 'enums.dart';
 import 'json.dart';
+import 'live_sessions.dart';
 import 'media_item.dart';
 import 'presence.dart';
 import 'rates.dart';
@@ -29,11 +32,14 @@ class ProfileSummary {
     this.relationshipIntent,
     this.dateTypes = const <String>[],
     this.services = const <String>[],
+    this.primaryService,
+    this.hookupServices = const <String>[],
+    this.liveSessions = MemberLiveSessions.empty,
     this.state,
     this.build,
     this.languages = const <String>[],
     this.rates = MemberRates.empty,
-    this.presence = Presence.away,
+    this.presence,
     this.viewCount = 0,
     this.prompts = const <String, String>{},
     this.isAvailableToday = false,
@@ -59,6 +65,7 @@ class ProfileSummary {
   final String? height;
   final String? ethnicity;
   final RelationshipIntent? relationshipIntent;
+
   /// **Deprecated.** The pre-2026-08-13 "Preferred Date Activities", kept
   /// because existing rows hold real choices. Nothing writes to it any more —
   /// [services] replaced it. Read-only here for the same reason.
@@ -67,6 +74,24 @@ class ProfileSummary {
   /// Catalogue ids from `lib/core/constants/services.dart` — never labels.
   /// Render with [serviceOptions] rather than printing these raw.
   final List<String> services;
+
+  /// The one thing this member is here for: a single id from
+  /// `lib/core/constants/primary_services.dart`, or **null** for a member who
+  /// registered before 2026-08-21 and has not chosen. Null renders no badge and
+  /// must never be given a default — see [primaryServiceOption].
+  final String? primaryService;
+
+  /// The explicit list, from `lib/core/constants/hookup_services.dart`.
+  ///
+  /// Only meaningful when [offersHookup] holds. The server strips it from every
+  /// payload where it does not (`withGatedHookupServices`), and
+  /// [hookupServiceOptions] applies the same gate again on read — a client that
+  /// renders an ungated list is a client that will eventually post one.
+  final List<String> hookupServices;
+
+  /// Per-minute prices in **credits**, not money. See
+  /// `lib/core/constants/live_sessions.dart`.
+  final MemberLiveSessions liveSessions;
 
   /// Subdivision within the country (a Nigerian state, a UK nation...).
   final String? state;
@@ -81,7 +106,11 @@ class ProfileSummary {
   final MemberRates rates;
 
   /// A coarse activity bucket. Never a timestamp — see [Presence].
-  final Presence presence;
+  ///
+  /// **Null means the member switched presence off**, which is not the same as
+  /// [Presence.away]: away is a claim about her, null is the absence of a claim.
+  /// Render nothing at all for null rather than substituting a bucket.
+  final Presence? presence;
 
   final int viewCount;
 
@@ -104,6 +133,18 @@ class ProfileSummary {
   /// The member's services as catalogue entries, in catalogue order. Retired
   /// entries are included so a profile keeps rendering everything it holds.
   List<ServiceOption> get serviceOptions => servicesForIds(services);
+
+  /// The catalogue entry for [primaryService], or null when unchosen.
+  PrimaryServiceOption? get primaryServiceOption =>
+      primaryServiceFor(primaryService);
+
+  /// Whether this member's booking block and explicit list should render.
+  bool get offersHookup => primaryService == kHookupId;
+
+  /// The explicit list as catalogue entries — **empty unless [offersHookup]**.
+  List<HookupServiceOption> get hookupServiceOptions => offersHookup
+      ? hookupServicesForIds(hookupServices)
+      : const <HookupServiceOption>[];
 
   List<MediaItem> get photos =>
       media.where((m) => !m.isVideo && m.hasUrl).toList(growable: false);
@@ -165,13 +206,25 @@ class ProfileSummary {
       ),
       dateTypes: asStringList(profile['dateTypes']),
       services: asStringList(profile['services']),
+      primaryService: sanitizePrimaryService(profile['primaryService']),
+      // Gated again on the way in. The server already does this, but the rule
+      // is cheap to hold and the failure it guards against is a public profile
+      // rendering an explicit list beside a "Chat Buddy" badge.
+      hookupServices: sanitizeHookupServices(
+        asStringList(profile['hookupServices']),
+        // Compared to the id directly rather than through offersHookup(): this
+        // is a factory, and the same name is an instance getter below.
+        offersHookup: asStringOrNull(profile['primaryService']) == kHookupId,
+      ),
+      liveSessions: MemberLiveSessions.fromProfileJson(profile),
       state: asStringOrNull(profile['state']),
       build: asStringOrNull(profile['build']),
       languages: asStringList(profile['languages']),
       rates: MemberRates.fromProfileJson(profile),
       // Presence sits on the user, not the dating profile: it is a bucket of
-      // `users.lastSeenAt`, which the server never sends raw.
-      presence: Presence.parse(json['presence']),
+      // `users.lastSeenAt`, which the server never sends raw. Parsed
+      // null-preserving, because a null here is the member's own choice.
+      presence: Presence.parseOrNull(json['presence']),
       viewCount: asIntOrNull(profile['viewCount']) ?? 0,
       prompts: _readPrompts(profile['prompts']),
       isAvailableToday: asBool(profile['isAvailableToday']),

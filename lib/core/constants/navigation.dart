@@ -267,6 +267,18 @@ const List<NavSection> kNavSections = <NavSection>[
         href: '/contact',
         kind: NavKind.website,
       ),
+      // Native rather than [NavKind.website]. The website's /app page tells a
+      // browser visitor there is nothing to download yet; opening it from
+      // inside the app would answer a question the member is plainly not
+      // asking. The app's own screen answers the one they are: what works now,
+      // and what does not.
+      NavItem(
+        label: 'Get the App',
+        icon: Icons.smartphone_rounded,
+        href: '/app',
+        kind: NavKind.native,
+        route: AppRoutes.getTheApp,
+      ),
     ],
   ),
   NavSection(
@@ -318,10 +330,7 @@ const List<NavSection> kNavSections = <NavSection>[
 
 /// Filters a section's items to what this viewer may see, mirroring
 /// `visibleItems` on the website.
-List<NavItem> visibleNavItems(
-  List<NavItem> items, {
-  required bool isSignedIn,
-}) {
+List<NavItem> visibleNavItems(List<NavItem> items, {required bool isSignedIn}) {
   return <NavItem>[
     for (final NavItem item in items)
       // No admin entries exist here, so `adminOnly` never hides anything —
