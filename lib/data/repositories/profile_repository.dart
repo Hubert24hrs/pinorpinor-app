@@ -82,9 +82,16 @@ class ProfileRepository {
     // primaryService at all, and reading the payload alone would wipe the list
     // they came to edit. So the caller passes the effective value, and when it
     // is absent the list is sent unchanged for the server to gate.
-    final String? effectiveService = primaryService == unsetPrimaryService
-        ? null
-        : primaryService as String?;
+    // Two separate questions, and collapsing them is a bug: "the caller is not
+    // touching the primary service" and "the caller is clearing it" both leave
+    // the effective value null, but they mean opposite things for the feature
+    // list. Absent means the stored service still governs and only the server
+    // can gate; explicit null means there is no catalogue any more, so nothing
+    // is storable.
+    final bool touchingService = primaryService != unsetPrimaryService;
+    final String? effectiveService = touchingService
+        ? primaryService as String?
+        : null;
 
     final body = <String, dynamic>{
       if (displayName != null) 'displayName': displayName.trim(),
@@ -118,16 +125,19 @@ class ProfileRepository {
       if (primaryService != unsetPrimaryService)
         'primaryService': sanitizePrimaryService(primaryService),
       if (serviceFeatures != null)
-        'serviceFeatures': effectiveService == null
-            // The caller is not touching the primary service, so the stored one
-            // still governs and only the server can apply the gate. Sent as
-            // held rather than dropped, or a features-only save would clear the
-            // very list the member came to edit.
-            ? serviceFeatures
-            : sanitizeServiceFeatures(
+        'serviceFeatures': touchingService
+            // Gated against the service this save is setting. A null one has no
+            // catalogue, so nothing is storable and an empty list is the honest
+            // payload.
+            ? sanitizeServiceFeatures(
                 serviceFeatures,
                 primaryService: effectiveService,
-              ),
+              )
+            // Not touching it, so the stored service still governs and only the
+            // server can apply the gate. Sent as held rather than dropped, or a
+            // features-only save would clear the very list the member came to
+            // edit.
+            : serviceFeatures,
       // The year the member typed. Nullable server-side, and clearing it is a
       // real operation, so an empty string is sent as null rather than skipped.
       if (birthYear != null)
