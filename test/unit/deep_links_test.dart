@@ -231,12 +231,14 @@ void main() {
           .listSync()
           .whereType<Directory>()
           .map((d) => d.path.split(RegExp(r'[\/]')).last)
-          .where((name) =>
-              !name.startsWith('[') &&
-              !name.startsWith('(') &&
-              !name.startsWith('_') &&
-              name != 'api' &&
-              name != 'admin')
+          .where(
+            (name) =>
+                !name.startsWith('[') &&
+                !name.startsWith('(') &&
+                !name.startsWith('_') &&
+                name != 'api' &&
+                name != 'admin',
+          )
           .toList();
 
       expect(slugs, isNotEmpty, reason: 'could not read the website pages');

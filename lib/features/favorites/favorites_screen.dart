@@ -116,9 +116,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                     final profile = page.profiles[index];
                     return ProfileCard(
                       profile: profile,
-                      onTap: () => context.push(
-                        AppRoutes.profileFor(profile.username),
-                      ),
+                      onTap: () =>
+                          context.push(AppRoutes.profileFor(profile.username)),
                     );
                   },
                 ),

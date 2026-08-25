@@ -179,7 +179,10 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                 const SizedBox(height: AppSpacing.md),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _deactivateAccount,
-                  icon: const Icon(Icons.pause_circle_outline_rounded, size: 18),
+                  icon: const Icon(
+                    Icons.pause_circle_outline_rounded,
+                    size: 18,
+                  ),
                   label: const Text('Deactivate my account'),
                 ),
 

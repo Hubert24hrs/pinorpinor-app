@@ -1,5 +1,5 @@
-import '../../core/constants/hookup_services.dart';
 import '../../core/constants/primary_services.dart';
+import '../../core/constants/service_features.dart';
 import '../../core/constants/services.dart';
 import 'enums.dart';
 import 'json.dart';
@@ -33,7 +33,7 @@ class ProfileSummary {
     this.dateTypes = const <String>[],
     this.services = const <String>[],
     this.primaryService,
-    this.hookupServices = const <String>[],
+    this.serviceFeatures = const <String>[],
     this.liveSessions = MemberLiveSessions.empty,
     this.state,
     this.build,
@@ -81,13 +81,19 @@ class ProfileSummary {
   /// must never be given a default — see [primaryServiceOption].
   final String? primaryService;
 
-  /// The explicit list, from `lib/core/constants/hookup_services.dart`.
+  /// What this member offers under [primaryService], from
+  /// `lib/core/constants/service_features.dart`.
   ///
-  /// Only meaningful when [offersHookup] holds. The server strips it from every
-  /// payload where it does not (`withGatedHookupServices`), and
-  /// [hookupServiceOptions] applies the same gate again on read — a client that
+  /// Renamed from `hookupServices` on 2026-08-22, when the website gave all six
+  /// primary services their own catalogue rather than only Hookup. **The ids are
+  /// only meaningful under the service beside them**: they are prefixed per
+  /// catalogue so none can be valid under two, and the server strips the column
+  /// down to what the member's own `primaryService` allows
+  /// (`withGatedServiceFeatures`).
+  ///
+  /// [serviceFeatureOptions] applies the same gate again on read. A client that
   /// renders an ungated list is a client that will eventually post one.
-  final List<String> hookupServices;
+  final List<String> serviceFeatures;
 
   /// Per-minute prices in **credits**, not money. See
   /// `lib/core/constants/live_sessions.dart`.
@@ -138,13 +144,24 @@ class ProfileSummary {
   PrimaryServiceOption? get primaryServiceOption =>
       primaryServiceFor(primaryService);
 
-  /// Whether this member's booking block and explicit list should render.
+  /// Whether this member's booking rates should render.
+  ///
+  /// The feature list is no longer gated on this — all six services have one
+  /// since 2026-08-22 — but the short time / overnight / weekend rates still
+  /// belong to Hookup alone.
   bool get offersHookup => primaryService == kHookupId;
 
-  /// The explicit list as catalogue entries — **empty unless [offersHookup]**.
-  List<HookupServiceOption> get hookupServiceOptions => offersHookup
-      ? hookupServicesForIds(hookupServices)
-      : const <HookupServiceOption>[];
+  /// The member's features as catalogue entries, in catalogue order.
+  ///
+  /// Empty when the stored ids do not belong to the service beside them, which
+  /// is what makes a stale or hostile payload render nothing rather than a list
+  /// borrowed from another catalogue.
+  List<ServiceFeature> get serviceFeatureOptions =>
+      serviceFeaturesForIds(primaryService, serviceFeatures);
+
+  /// The heading shown above that list, which differs per service: what someone
+  /// *offers* under Hookup, what they *want* under Relationship.
+  String get serviceFeaturesHeading => featuresHeading(primaryService);
 
   List<MediaItem> get photos =>
       media.where((m) => !m.isVideo && m.hasUrl).toList(growable: false);
@@ -209,12 +226,10 @@ class ProfileSummary {
       primaryService: sanitizePrimaryService(profile['primaryService']),
       // Gated again on the way in. The server already does this, but the rule
       // is cheap to hold and the failure it guards against is a public profile
-      // rendering an explicit list beside a "Chat Buddy" badge.
-      hookupServices: sanitizeHookupServices(
-        asStringList(profile['hookupServices']),
-        // Compared to the id directly rather than through offersHookup(): this
-        // is a factory, and the same name is an instance getter below.
-        offersHookup: asStringOrNull(profile['primaryService']) == kHookupId,
+      // rendering one catalogue's list beside another catalogue's badge.
+      serviceFeatures: sanitizeServiceFeatures(
+        asStringList(profile['serviceFeatures']),
+        primaryService: asStringOrNull(profile['primaryService']),
       ),
       liveSessions: MemberLiveSessions.fromProfileJson(profile),
       state: asStringOrNull(profile['state']),

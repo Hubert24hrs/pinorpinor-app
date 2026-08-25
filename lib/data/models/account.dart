@@ -1,5 +1,5 @@
-import '../../core/constants/hookup_services.dart';
 import '../../core/constants/primary_services.dart';
+import '../../core/constants/service_features.dart';
 import 'enums.dart';
 import 'json.dart';
 import 'live_sessions.dart';
@@ -171,7 +171,8 @@ class DatingProfile {
     this.dateTypes = const <String>[],
     this.services = const <String>[],
     this.primaryService,
-    this.hookupServices = const <String>[],
+    this.birthYear,
+    this.serviceFeatures = const <String>[],
     this.liveSessions = MemberLiveSessions.empty,
     this.state,
     this.build,
@@ -214,9 +215,22 @@ class DatingProfile {
   /// saving a guess publishes a claim the member never made.
   final String? primaryService;
 
-  /// The explicit list. Stored only while [primaryService] is Hookup; switching
-  /// away clears the column server-side rather than leaving it dormant.
-  final List<String> hookupServices;
+  /// The year the member typed, or null for an account that predates the
+  /// question.
+  ///
+  /// **The owner's own value, and only theirs.** It is stripped from every
+  /// public payload alongside `birthDate`, because publishing a precise year is
+  /// worse than the derived age it replaces. Other members' profiles carry
+  /// `age`, already resolved server-side.
+  final int? birthYear;
+
+  /// What the member offers under [primaryService].
+  ///
+  /// Renamed from `hookupServices` on 2026-08-22 and generalised to all six
+  /// services. **Switching primary service clears the column** server-side: the
+  /// ids belong to the old catalogue and mean nothing under the new one, so
+  /// keeping them would leave a Relationship profile holding Hookup selections.
+  final List<String> serviceFeatures;
 
   /// Per-minute prices in **credits**. Never money — see
   /// `lib/core/constants/live_sessions.dart`.
@@ -262,10 +276,17 @@ class DatingProfile {
   final DateTime? featuredUntil;
   final int viewCount;
 
-  /// Whether the hookup booking block and the explicit list apply to this
-  /// profile. The editor renders them on this answer; the server re-derives it
-  /// from the stored row on every write.
+  /// Whether the hookup booking block applies to this profile. The editor
+  /// renders the rates on this answer; the server re-derives it from the stored
+  /// row on every write.
+  ///
+  /// The feature list is **not** gated on this any more — all six services have
+  /// one — but the booking rates still are.
   bool get offersHookup => primaryService == kHookupId;
+
+  /// The member's features as catalogue entries, in catalogue order.
+  List<ServiceFeature> get serviceFeatureOptions =>
+      serviceFeaturesForIds(primaryService, serviceFeatures);
 
   /// The catalogue entry for [primaryService], or null when unchosen.
   PrimaryServiceOption? get primaryServiceOption =>
@@ -284,9 +305,10 @@ class DatingProfile {
     dateTypes: asStringList(json['dateTypes']),
     services: asStringList(json['services']),
     primaryService: sanitizePrimaryService(json['primaryService']),
-    hookupServices: sanitizeHookupServices(
-      asStringList(json['hookupServices']),
-      offersHookup: asStringOrNull(json['primaryService']) == kHookupId,
+    birthYear: asIntOrNull(json['birthYear']),
+    serviceFeatures: sanitizeServiceFeatures(
+      asStringList(json['serviceFeatures']),
+      primaryService: asStringOrNull(json['primaryService']),
     ),
     liveSessions: MemberLiveSessions.fromProfileJson(json),
     state: asStringOrNull(json['state']),

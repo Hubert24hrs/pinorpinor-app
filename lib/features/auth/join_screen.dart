@@ -14,11 +14,14 @@ import '../../core/routing/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
+import '../../core/constants/service_features.dart';
+import '../../core/utils/age.dart';
 import '../../core/utils/money.dart';
 import '../../core/utils/validators.dart';
 import '../../data/models/enums.dart';
 import '../../data/repositories/auth_repository.dart';
-import '../profile/hookup_details_form.dart';
+import '../profile/hookup_rates_form.dart';
+import '../profile/service_feature_picker.dart';
 import '../profile/primary_service_picker.dart';
 import '../../shared/utils/legal_links.dart';
 import '../../shared/widgets/brand.dart';
@@ -76,10 +79,11 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
   final _phoneController = TextEditingController();
   final _bioController = TextEditingController();
   final _referralController = TextEditingController();
+  final _birthYearController = TextEditingController();
 
   Gender? _gender;
   String? _primaryService;
-  final List<String> _hookupServices = <String>[];
+  final List<String> _serviceFeatures = <String>[];
   final Map<String, String> _rates = <String, String>{};
   bool _isAdult = false;
 
@@ -125,6 +129,7 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
     _phoneController.dispose();
     _bioController.dispose();
     _referralController.dispose();
+    _birthYearController.dispose();
     super.dispose();
   }
 
@@ -186,6 +191,11 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
       setState(() => _error = 'Choose the one service you are here for.');
       return;
     }
+    final String? yearError = birthYearError(_birthYearController.text);
+    if (yearError != null) {
+      setState(() => _error = yearError);
+      return;
+    }
     if (!_isAdult) {
       setState(
         () => _error =
@@ -210,19 +220,23 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
             gender: _gender!,
             primaryService: _primaryService!,
             isAdult: _isAdult,
-            // Sent only under the hookup badge. The repository gates them again
-            // and so does the route; this is the first of the three, and the
-            // one that stops a form's leftover state reaching the wire at all.
-            hookupServices: _wantsHookup ? _hookupServices : const <String>[],
+            birthYear: _birthYearController.text,
+            // Gated to the chosen service's catalogue. The repository gates
+            // them again and so does the route; this is the first of the three,
+            // and the one that stops a form's leftover state reaching the wire
+            // at all.
+            serviceFeatures: _serviceFeatures,
             rates: _wantsHookup ? _rates : const <String, String>{},
             referralCode: _referralController.text,
           );
 
       if (!mounted) return;
-      // Straight to verification: the number is unproven until a code is
-      // confirmed, and saying so immediately beats letting the member wonder
-      // why nothing has happened.
-      context.go(AppRoutes.verification);
+      // Straight to the photo step. Since 2026-08-24 every listing filters on
+      // an approved, public PROFILE_PHOTO, so a member without one is not
+      // merely plain-looking in the grid — they are absent from it, including
+      // from their own city's counts. Sending them to verification first would
+      // let them finish onboarding invisible.
+      context.go(AppRoutes.manageMedia);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -399,17 +413,19 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // Said before the member commits, not after. Registration collects
-            // no email address, so there is genuinely nothing to send a reset
-            // link to — this is the one warning on the screen that describes an
-            // outcome nobody can undo.
+            // Rewritten 2026-08-25. This used to say a forgotten password
+            // could never be reset, which was true when registration stopped
+            // collecting email addresses and stopped being true on 2026-08-22,
+            // when WhatsApp recovery shipped. Telling someone at signup that a
+            // mistake is unrecoverable when it is recoverable frightens people
+            // off a form for nothing.
             const _NoticeCard(
-              icon: Icons.key_off_rounded,
-              title: 'Keep your password safe',
+              icon: Icons.lock_reset_rounded,
+              title: 'If you forget your password',
               body:
-                  'We do not ask for an email address, so there is no way to '
-                  'reset a forgotten password. Save it somewhere you trust '
-                  'before you continue.',
+                  'We do not ask for an email address. You can reset your '
+                  'password with a code sent to your WhatsApp number, so use '
+                  'a number you can actually receive messages on.',
             ),
 
             const SizedBox(height: AppSpacing.xxl),
@@ -588,6 +604,36 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
             const SizedBox(height: AppSpacing.lg),
           ],
 
+          // The year, not a full date. One box gets filled in where three do
+          // not, and it restores a server-side age bound that had not existed
+          // since date of birth was dropped on 2026-08-14 — for eight days the
+          // tickbox below was the only thing between a minor and an account.
+          //
+          // Still a declaration, never verification: nothing here is checked,
+          // and the copy must never say otherwise.
+          Text('Your year of birth', style: theme.textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _birthYearController,
+            keyboardType: TextInputType.number,
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(4),
+            ],
+            decoration: const InputDecoration(
+              labelText: 'Year of birth',
+              hintText: '1998',
+              prefixIcon: Icon(Icons.cake_outlined, size: 20),
+              helperText:
+                  'You must be 18 or over. Members see your age, never the '
+                  'year itself.',
+              helperMaxLines: 2,
+            ),
+            validator: birthYearError,
+            onChanged: (_) => setState(() => _error = null),
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
           // Gender. Not decoration: discovery filters on it, so a wrong answer
           // here leaves a profile that looks right to its owner and appears in
           // nobody else's browsing.
@@ -626,15 +672,35 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
               // Choosing something else discards whatever was typed into the
               // hookup branch, rather than keeping it in state where it would
               // eventually be submitted alongside a badge that contradicts it.
-              if (!offersHookup(id)) {
-                _hookupServices.clear();
-                _rates.clear();
-              }
+              // Both are cleared on a switch, and for the same reason: the
+              // feature ids belong to the old catalogue and mean nothing under
+              // the new one, and rates are Hookup-only. Keeping either in
+              // state would submit answers the member can no longer see.
+              if (id != _primaryService) _serviceFeatures.clear();
+              if (!offersHookup(id)) _rates.clear();
               _primaryService = id;
               _error = null;
             }),
           ),
 
+          // What they offer, under whichever service they picked. All six
+          // have a catalogue since 2026-08-22.
+          if (featuresFor(_primaryService).isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.lg),
+            ServiceFeaturePicker(
+              primaryService: _primaryService,
+              selected: _serviceFeatures,
+              onChanged: (next) => setState(() {
+                _serviceFeatures
+                  ..clear()
+                  ..addAll(next);
+              }),
+            ),
+          ],
+
+          // Booking rates stay Hookup-only: they are money for a meeting
+          // arranged over WhatsApp, and the other five services do not
+          // describe a meeting that is charged for.
           if (_wantsHookup) ...<Widget>[
             const SizedBox(height: AppSpacing.lg),
             Container(
@@ -644,15 +710,9 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
                 border: Border.all(color: AppColors.border),
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-              child: HookupDetailsForm(
+              child: HookupRatesForm(
                 rates: _rates,
                 onRateChanged: (field, value) => _rates[field] = value,
-                services: _hookupServices,
-                onServicesChanged: (next) => setState(() {
-                  _hookupServices
-                    ..clear()
-                    ..addAll(next);
-                }),
                 currencyCode: currencyCode,
               ),
             ),
@@ -694,7 +754,11 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
           GradientButton(
             label: 'Create my account',
             isLoading: _submitting,
-            onPressed: _isAdult && _gender != null && _primaryService != null
+            onPressed:
+                _isAdult &&
+                    _gender != null &&
+                    _primaryService != null &&
+                    birthYearError(_birthYearController.text) == null
                 ? _submit
                 : null,
           ),

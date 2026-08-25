@@ -13,9 +13,10 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
 import '../../data/models/media_item.dart';
 import '../../data/models/profile.dart';
-import '../../data/repositories/whatsapp_repository.dart';
+import '../../core/constants/credits.dart';
+import '../../data/repositories/contact_access_repository.dart';
 import '../../shared/utils/legal_links.dart';
-import '../../core/constants/hookup_services.dart';
+import '../../core/constants/service_features.dart';
 import '../../data/models/presence.dart';
 import '../../data/models/live_sessions.dart';
 import '../../shared/widgets/brand.dart';
@@ -24,6 +25,7 @@ import '../auth/login_screen.dart' show InlineNotice;
 import '../../shared/widgets/profile_image.dart';
 import '../../shared/widgets/states.dart';
 import '../auth/auth_controller.dart';
+import 'account_providers.dart';
 import '../discovery/discovery_providers.dart';
 import '../favorites/favorites_screen.dart';
 import '../media/media_viewer.dart';
@@ -53,10 +55,22 @@ class ProfileDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
-  String? _contactStatus;
   bool _contactBusy = false;
 
-  Future<void> _requestContact(ProfileSummary profile) async {
+  /// Set when the last attempt was refused for a reason the member has to see
+  /// rather than a snackbar they can miss. Cleared on the next attempt.
+  ContactAccessFailure? _contactRefusal;
+
+  /// Opens a WhatsApp chat, **which spends credits**.
+  ///
+  /// Until 2026-08-23 this was a consent flow: ask, wait, and the member decides.
+  /// Those endpoints no longer exist. Opening a chat now costs the viewer
+  /// [kWhatsAppUnlockCredits] and costs the member being contacted the same, in
+  /// one transaction — if either wallet is short, neither is charged.
+  ///
+  /// The price is on the button before the tap, so this method never spends
+  /// anything the member has not already been shown.
+  Future<void> _openWhatsApp(ProfileSummary profile) async {
     final auth = ref.read(authControllerProvider);
     if (!auth.isSignedIn) {
       final redirect = Uri.encodeComponent(
@@ -68,48 +82,32 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
       return;
     }
 
-    final note = await showModalBottomSheet<String?>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _ContactNoteSheet(displayName: profile.displayName),
-    );
-    if (note == null) return; // Cancelled.
+    setState(() {
+      _contactBusy = true;
+      _contactRefusal = null;
+    });
 
-    setState(() => _contactBusy = true);
-    try {
-      final status = await ref
-          .read(contactRepositoryProvider)
-          .requestContact(widget.username, message: note.isEmpty ? null : note);
-      if (!mounted) return;
-      setState(() => _contactStatus = status);
-      _showSnack(
-        status == 'ACCEPTED'
-            ? 'You can now open WhatsApp with ${profile.displayName}.'
-            : status == 'DECLINED'
-            ? '${profile.displayName} declined this request.'
-            : 'Request sent. ${profile.displayName} will be notified.',
-      );
-    } on ApiException catch (error) {
-      if (mounted) _showSnack(error.message);
-    } finally {
-      if (mounted) setState(() => _contactBusy = false);
-    }
-  }
-
-  Future<void> _openWhatsApp() async {
-    setState(() => _contactBusy = true);
     try {
       final link = await ref
-          .read(whatsAppRepositoryProvider)
-          .resolveChatLink(widget.username);
+          .read(contactAccessRepositoryProvider)
+          .openChat(widget.username);
+
+      // The wallet has just changed on both sides, so anything showing a
+      // balance has to re-read rather than keep a stale figure.
+      ref.invalidate(walletProvider);
 
       // Try the installed app first, then the web link. The second call is not
       // a retry of a failure — `wa.me` is a legitimate destination when
       // WhatsApp is not installed.
       final opened = await LegalLinks.openExternal(
-        WhatsAppRepository.toAppScheme(link),
+        ContactAccessRepository.toAppScheme(link),
       );
       if (!opened) await LegalLinks.openExternal(link);
+    } on ContactAccessFailure catch (refusal) {
+      // Rendered in place, not as a snackbar: one of these is actionable (top
+      // up) and the other is not (the other side cannot receive), and both
+      // deserve more than three seconds on screen.
+      if (mounted) setState(() => _contactRefusal = refusal);
     } on ApiException catch (error) {
       if (mounted) _showSnack(error.message);
     } finally {
@@ -297,10 +295,9 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                 const SizedBox(height: AppSpacing.xl),
                 _ContactSection(
                   profile: profile,
-                  status: _contactStatus,
                   busy: _contactBusy,
-                  onRequest: () => _requestContact(profile),
-                  onOpenWhatsApp: _openWhatsApp,
+                  refusal: _contactRefusal,
+                  onOpenWhatsApp: () => _openWhatsApp(profile),
                 ),
 
                 if (profile.bio != null &&
@@ -347,27 +344,35 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                   ),
                 ],
 
-                // The explicit list, gated on Hookup exactly as the server
-                // gates it. hookupServiceOptions returns nothing under any
-                // other badge, so this section cannot be rendered by a payload
-                // that should not have carried the column at all -- which is
-                // the failure the website had in August, when the screens
-                // stopped showing this list and four endpoints kept publishing
-                // it as JSON.
-                if (profile.hookupServiceOptions.isNotEmpty) ...<Widget>[
+                // What the member offers under their own primary service.
+                //
+                // Every one of the six has a catalogue since 2026-08-22, and
+                // the ids are prefixed per catalogue so none is valid under
+                // two. serviceFeatureOptions returns nothing when the stored
+                // ids do not belong to the service beside them, so this section
+                // cannot render a list borrowed from another catalogue -- which
+                // is the failure the website had in August, when its screens
+                // stopped showing the explicit list and four endpoints kept
+                // publishing it as JSON.
+                if (profile.serviceFeatureOptions.isNotEmpty) ...<Widget>[
                   const SizedBox(height: AppSpacing.xxl),
-                  const _SectionTitle(title: 'What she offers'),
+                  // The heading differs per service on purpose: what someone
+                  // *offers* under Hookup, what they *want* under
+                  // Relationship. One generic word over both would make the
+                  // Relationship list read as a menu.
+                  _SectionTitle(title: profile.serviceFeaturesHeading),
                   const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: AppSpacing.sm,
                     runSpacing: AppSpacing.sm,
                     children: <Widget>[
-                      // Only what she selected, never the catalogue with the
-                      // rest greyed out. On this list in particular, showing
-                      // what someone declined beside what they offer publishes
-                      // a far more specific claim than they agreed to.
-                      for (final HookupServiceOption option
-                          in profile.hookupServiceOptions)
+                      // Only what they selected, never the catalogue with the
+                      // rest greyed out. On the explicit list in particular,
+                      // showing what someone declined beside what they offer
+                      // publishes a far more specific claim than they agreed
+                      // to.
+                      for (final ServiceFeature option
+                          in profile.serviceFeatureOptions)
                         Chip(label: Text(option.label)),
                     ],
                   ),
@@ -582,12 +587,10 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
 
   List<Widget> _buildDetails(ProfileSummary profile) {
     final rows = <(IconData, String, String)>[
-      if (profile.relationshipIntent != null)
-        (
-          Icons.favorite_outline_rounded,
-          'Looking for',
-          profile.relationshipIntent!.label,
-        ),
+      // `relationshipIntent` is gone: the website removed the dropdown that
+      // wrote it on 2026-08-25 and stopped selecting it into any payload.
+      // Nothing ever rendered it there, and the primary service badge above is
+      // the field that answers the same question visibly.
       if (profile.height != null)
         (Icons.height_rounded, 'Height', profile.height!),
       if (profile.build != null)
@@ -635,19 +638,33 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
   }
 }
 
+/// The contact block: a price, a button, and the truth about both.
+///
+/// ## What this used to be
+///
+/// A consent flow — ask, wait, the member accepts or declines. The website
+/// removed it on 2026-08-23 and replaced it with a price. There is no longer
+/// anything to ask for and nothing to wait on: a chat opens the moment both
+/// wallets can cover it.
+///
+/// ## Both sides pay, and the app has to say so
+///
+/// The viewer pays [kWhatsAppUnlockCredits] and **the member being contacted
+/// pays the same**. That has a consequence a member cannot work out from
+/// anywhere else: a balance below the price makes them unreachable, and credits
+/// leave their wallet by being contacted rather than by doing anything. An app
+/// that stays quiet about it turns a rule into what looks like a bug.
 class _ContactSection extends ConsumerWidget {
   const _ContactSection({
     required this.profile,
-    required this.status,
     required this.busy,
-    required this.onRequest,
+    required this.refusal,
     required this.onOpenWhatsApp,
   });
 
   final ProfileSummary profile;
-  final String? status;
   final bool busy;
-  final VoidCallback onRequest;
+  final ContactAccessFailure? refusal;
   final VoidCallback onOpenWhatsApp;
 
   @override
@@ -656,66 +673,62 @@ class _ContactSection extends ConsumerWidget {
       authControllerProvider.select((auth) => auth.isSignedIn),
     );
 
-    return switch (status) {
-      'ACCEPTED' => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          GradientButton(
-            label: 'Open WhatsApp',
-            icon: Icons.chat_rounded,
-            isLoading: busy,
-            gradient: const LinearGradient(
-              colors: <Color>[Color(0xFF25D366), Color(0xFF128C7E)],
+    final ContactAccessFailure? refused = refusal;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        if (refused != null) ...<Widget>[
+          _ContactStatusCard(
+            icon: refused.reason == ContactAccessRefusal.viewerShort
+                ? Icons.account_balance_wallet_outlined
+                : Icons.do_not_disturb_on_outlined,
+            background: AppColors.badgeGoldBg,
+            border: AppColors.badgeGoldBorder,
+            foreground: AppColors.badgeGoldFg,
+            title: refused.reason == ContactAccessRefusal.viewerShort
+                ? 'Not enough credits'
+                : 'Not accepting messages',
+            // The server's own wording. The second case names no balance and
+            // blames nobody: the viewer did nothing wrong and has no business
+            // learning what is in somebody else's wallet.
+            message: refused.message,
+          ),
+          if (refused.reason == ContactAccessRefusal.viewerShort) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Top up credits'),
+              onPressed: () => unawaited(context.push(AppRoutes.credits)),
             ),
-            onPressed: onOpenWhatsApp,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            '${profile.displayName} accepted your request.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          ],
+          const SizedBox(height: AppSpacing.md),
         ],
-      ),
-      'PENDING' => _ContactStatusCard(
-        icon: Icons.hourglass_top_rounded,
-        background: AppColors.badgeGoldBg,
-        border: AppColors.badgeGoldBorder,
-        foreground: AppColors.badgeGoldFg,
-        title: 'Request sent',
-        message:
-            '${profile.displayName} has been notified. You will hear '
-            'back in your notifications.',
-      ),
-      'DECLINED' => _ContactStatusCard(
-        icon: Icons.do_not_disturb_on_outlined,
-        background: AppColors.bgMuted,
-        border: AppColors.border,
-        foreground: AppColors.textSecondary,
-        title: 'Request declined',
-        message:
-            '${profile.displayName} decided not to share contact. '
-            'Please respect that.',
-      ),
-      _ => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          GradientButton(
-            label: signedIn ? 'Request contact' : 'Sign in to request contact',
-            icon: Icons.waving_hand_rounded,
-            isLoading: busy,
-            onPressed: onRequest,
+
+        GradientButton(
+          label: signedIn
+              ? 'Open WhatsApp — $kWhatsAppUnlockCredits credits'
+              : 'Sign in to open WhatsApp',
+          icon: Icons.chat_rounded,
+          isLoading: busy,
+          gradient: const LinearGradient(
+            colors: <Color>[Color(0xFF25D366), Color(0xFF128C7E)],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            "${profile.displayName}'s number is never shown here. You ask, "
-            'and they decide.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
-    };
+          onPressed: onOpenWhatsApp,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          signedIn
+              ? 'Opening a chat costs you $kWhatsAppUnlockCredits credits and '
+                    'costs ${profile.displayName} the same. Reaching the same '
+                    'member again later is free.'
+              : "${profile.displayName}'s number is never shown here. Sign in "
+                    'to open a chat.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
   }
 }
 
@@ -769,79 +782,6 @@ class _ContactStatusCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ContactNoteSheet extends StatefulWidget {
-  const _ContactNoteSheet({required this.displayName});
-
-  final String displayName;
-
-  @override
-  State<_ContactNoteSheet> createState() => _ContactNoteSheetState();
-}
-
-class _ContactNoteSheetState extends State<_ContactNoteSheet> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xl,
-            0,
-            AppSpacing.xl,
-            AppSpacing.xl,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Text(
-                'Ask ${widget.displayName} to connect',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'They will see your profile and this note, then decide whether '
-                'to share their WhatsApp.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              TextField(
-                controller: _controller,
-                maxLines: 3,
-                maxLength: 300,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Add a note (optional)',
-                  hintText: 'Say hello and why you would like to chat.',
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              GradientButton(
-                label: 'Send request',
-                icon: Icons.send_rounded,
-                onPressed: () =>
-                    Navigator.of(context).pop(_controller.text.trim()),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

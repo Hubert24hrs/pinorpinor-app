@@ -21,7 +21,6 @@ import '../../features/media/manage_media_screen.dart';
 import '../../features/messaging/conversation_screen.dart';
 import '../../features/messaging/matches_screen.dart';
 import '../../features/messaging/messages_screen.dart';
-import '../../features/notifications/contact_requests_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/profile/account_screen.dart';
 import '../../features/profile/edit_profile_screen.dart';
@@ -226,11 +225,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.credits,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const CreditsScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.contactRequests,
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const ContactRequestsScreen(),
       ),
       GoRoute(
         path: AppRoutes.settings,

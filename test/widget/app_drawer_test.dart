@@ -92,7 +92,11 @@ void main() {
     expect(find.text('Settings'), findsNothing);
     // Instead they get the way in — at the foot of the list, so scroll to it.
     final signIn = find.text('Sign in');
-    await tester.scrollUntilVisible(signIn, 200, scrollable: find.byType(Scrollable).last);
+    await tester.scrollUntilVisible(
+      signIn,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.pumpAndSettle();
     expect(signIn, findsWidgets);
   });

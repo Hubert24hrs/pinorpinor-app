@@ -164,16 +164,16 @@ class RateRow {
 /// The rate field names `PATCH /api/profile` accepts, matching `RATE_FIELDS`.
 const List<({String field, String label})> kRateFields =
     <({String field, String label})>[
-  (field: 'rateShortIncall', label: 'Short time — incall'),
-  (field: 'rateShortOutcall', label: 'Short time — outcall'),
-  (field: 'rateNightIncall', label: 'Overnight — incall'),
-  (field: 'rateNightOutcall', label: 'Overnight — outcall'),
-  (field: 'rateWeekendIncall', label: 'Weekend — incall'),
-  (field: 'rateWeekendOutcall', label: 'Weekend — outcall'),
-  (field: 'rateAudioPerMin', label: 'Custom audio, per minute'),
-  (field: 'rateVideoPerMin', label: 'Custom video, per minute'),
-  (field: 'rateCallPerMin', label: 'Phone call, per minute'),
-];
+      (field: 'rateShortIncall', label: 'Short time — incall'),
+      (field: 'rateShortOutcall', label: 'Short time — outcall'),
+      (field: 'rateNightIncall', label: 'Overnight — incall'),
+      (field: 'rateNightOutcall', label: 'Overnight — outcall'),
+      (field: 'rateWeekendIncall', label: 'Weekend — incall'),
+      (field: 'rateWeekendOutcall', label: 'Weekend — outcall'),
+      (field: 'rateAudioPerMin', label: 'Custom audio, per minute'),
+      (field: 'rateVideoPerMin', label: 'Custom video, per minute'),
+      (field: 'rateCallPerMin', label: 'Phone call, per minute'),
+    ];
 
 /// Upper bound on any single rate, in major units — the same ceiling the
 /// backend enforces. The column is a 32-bit integer, so a large enough figure

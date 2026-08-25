@@ -45,12 +45,18 @@ void main() {
     repository = AuthRepository(client);
   });
 
+  /// A year that is comfortably an adult whenever this test runs, derived
+  /// rather than hardcoded: a literal 1998 would start failing in 2098, and a
+  /// test that expires is a test somebody deletes.
+  final String adultYear = '${DateTime.now().year - 30}';
+
   Future<void> join({
     String primaryService = 'dinner_date',
     Gender gender = Gender.woman,
     List<String> services = const <String>[],
-    List<String> hookupServices = const <String>[],
+    List<String> serviceFeatures = const <String>[],
     Map<String, String> rates = const <String, String>{},
+    String? birthYear,
   }) async {
     adapter.enqueueJson(<String, dynamic>{
       'success': true,
@@ -65,8 +71,9 @@ void main() {
       gender: gender,
       primaryService: primaryService,
       isAdult: true,
+      birthYear: birthYear ?? adultYear,
       services: services,
-      hookupServices: hookupServices,
+      serviceFeatures: serviceFeatures,
       rates: rates,
     );
   }
@@ -101,6 +108,7 @@ void main() {
           gender: Gender.woman,
           primaryService: 'not_a_service',
           isAdult: true,
+          birthYear: adultYear,
         ),
         throwsA(
           isA<ApiException>().having((e) => e.field, 'field', 'primaryService'),
@@ -121,6 +129,7 @@ void main() {
             gender: Gender.woman,
             primaryService: 'dinner_date',
             isAdult: false,
+            birthYear: adultYear,
           ),
           throwsA(
             isA<ApiException>().having((e) => e.field, 'field', 'isAdult'),
@@ -139,43 +148,105 @@ void main() {
     });
   });
 
-  group('the hookup gate, applied on the way out', () {
-    test('the list and the rates are sent under the hookup badge', () async {
+  group('the age bound', () {
+    test('the year is sent as a number, never a synthesised date', () async {
+      await join();
+      expect(adapter.lastJsonBody!['birthYear'], int.parse(adultYear));
+      expect(
+        adapter.lastJsonBody!.containsKey('birthDate'),
+        isFalse,
+        reason:
+            'writing 1 January into birthDate would be indistinguishable later '
+            'from a real date of birth, and real ones exist on this platform',
+      );
+    });
+
+    test(
+      'a year that makes the member under 18 never leaves the device',
+      () async {
+        await expectLater(
+          join(birthYear: '${DateTime.now().year - 10}'),
+          throwsA(
+            isA<ApiException>().having((e) => e.field, 'field', 'birthYear'),
+          ),
+        );
+        expect(adapter.requests, isEmpty);
+      },
+    );
+
+    test('a year before the database floor is refused', () async {
+      await expectLater(
+        join(birthYear: '1200'),
+        throwsA(
+          isA<ApiException>().having((e) => e.field, 'field', 'birthYear'),
+        ),
+      );
+    });
+
+    test(
+      'an unparseable year is refused with the route\'s own wording',
+      () async {
+        await expectLater(
+          join(birthYear: 'nineteen ninety eight'),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.message,
+              'message',
+              contains('year of birth'),
+            ),
+          ),
+        );
+      },
+    );
+  });
+
+  group('the feature gate, applied on the way out', () {
+    test('features and rates are sent under the hookup badge', () async {
       await join(
         primaryService: 'hookup',
-        hookupServices: <String>['massage'],
+        serviceFeatures: <String>['massage'],
         rates: <String, String>{'rateShortIncall': '50000'},
       );
 
       final body = adapter.lastJsonBody!;
-      expect(body['hookupServices'], <String>['massage']);
+      expect(body['serviceFeatures'], <String>['massage']);
       expect((body['rates']! as Map)['rateShortIncall'], '50000');
     });
 
-    test('and dropped under any other badge', () async {
-      // The server discards them anyway. The point of doing it here as well is
-      // that a form's leftover state never reaches the wire at all.
+    test('every service has its own catalogue now, not only hookup', () async {
+      // The asymmetry this removed: until 2026-08-22 a Relationship profile was
+      // a bare badge while a Hookup profile carried thirty specifics.
+      await join(
+        primaryService: 'relationship',
+        serviceFeatures: <String>['rel_long_term'],
+      );
+      expect(adapter.lastJsonBody!['serviceFeatures'], <String>[
+        'rel_long_term',
+      ]);
+    });
+
+    test('an id from another catalogue is dropped', () async {
+      // Ids are prefixed per service precisely so this is decidable. A member
+      // switching service must not keep a selection that happened to collide.
+      await join(
+        primaryService: 'relationship',
+        serviceFeatures: <String>['massage', 'rel_long_term'],
+      );
+      expect(adapter.lastJsonBody!['serviceFeatures'], <String>[
+        'rel_long_term',
+      ]);
+    });
+
+    test('rates are dropped under any other badge', () async {
       await join(
         primaryService: 'chat_buddy',
-        hookupServices: <String>['massage'],
         rates: <String, String>{'rateShortIncall': '50000'},
       );
-
-      final body = adapter.lastJsonBody!;
-      expect(body['hookupServices'], isEmpty);
       expect(
-        body.containsKey('rates'),
+        adapter.lastJsonBody!.containsKey('rates'),
         isFalse,
         reason: 'no rates key at all under a non-hookup service',
       );
-    });
-
-    test('unknown ids in the list are dropped, not rejected', () async {
-      await join(
-        primaryService: 'hookup',
-        hookupServices: <String>['not_a_real_one', 'massage'],
-      );
-      expect(adapter.lastJsonBody!['hookupServices'], <String>['massage']);
     });
 
     test('rates are sent as typed, never converted here', () async {
@@ -229,12 +300,16 @@ void main() {
         'phone',
         'bio',
         'gender',
+        'birthYear',
         'primaryService',
         'services',
-        'hookupServices',
+        'serviceFeatures',
         'rates',
         'isAdult',
         'referralCode',
+        // Sent when the app holds one. The route requires it only while
+        // WHATSAPP_OTP_ENABLED is on, and decides that for itself.
+        'whatsappProof',
       };
 
       for (final String field in rejected) {

@@ -59,9 +59,7 @@ class AppDrawer extends ConsumerWidget {
 
             if (isSignedIn && auth.session != null)
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Row(
                   children: <Widget>[
                     const Icon(

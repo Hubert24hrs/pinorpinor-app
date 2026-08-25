@@ -5,12 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/countries.dart';
 import '../../core/constants/live_sessions.dart';
 import '../../core/constants/primary_services.dart';
+import '../../core/constants/service_features.dart';
 import '../../core/constants/services.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
+import '../../core/utils/age.dart';
 import '../../core/utils/money.dart';
 import '../../core/utils/validators.dart';
 import '../../data/models/account.dart';
@@ -20,7 +22,8 @@ import '../../shared/widgets/brand.dart';
 import '../../shared/widgets/states.dart';
 import '../auth/login_screen.dart';
 import 'account_providers.dart';
-import 'hookup_details_form.dart';
+import 'hookup_rates_form.dart';
+import 'service_feature_picker.dart';
 import 'primary_service_picker.dart';
 
 /// Edits the member's own profile.
@@ -45,16 +48,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _cityController = TextEditingController();
   final _heightController = TextEditingController();
   final _ethnicityController = TextEditingController();
+  final _birthYearController = TextEditingController();
 
   String? _countryCode;
-  RelationshipIntent? _intent;
   final Set<String> _services = <String>{};
   bool _availableToday = false;
 
   /// Null until chosen, and null is savable. A member who joined before
   /// 2026-08-21 has no primary service, and the picker must not invent one.
   String? _primaryService;
-  final List<String> _hookupServices = <String>[];
+
+  /// What the member offers under [_primaryService]. Cleared whenever that
+  /// changes, because the ids belong to the old catalogue and mean nothing
+  /// under the new one — the server does the same on save.
+  final List<String> _serviceFeatures = <String>[];
 
   /// What the member typed, in MAJOR units. Converted server-side, never here.
   final Map<String, String> _rates = <String, String>{};
@@ -84,6 +91,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _cityController.dispose();
     _heightController.dispose();
     _ethnicityController.dispose();
+    _birthYearController.dispose();
     super.dispose();
   }
 
@@ -99,7 +107,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _countryCode = normalizeCountryCode(
       account.profile.countryCode ?? account.profile.country,
     );
-    _intent = account.profile.relationshipIntent;
     _services
       ..clear()
       ..addAll(account.profile.services);
@@ -107,9 +114,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _showOnline = account.profile.showOnline;
 
     _primaryService = account.profile.primaryService;
-    _hookupServices
+    _serviceFeatures
       ..clear()
-      ..addAll(account.profile.hookupServices);
+      ..addAll(account.profile.serviceFeatures);
+    _birthYearController.text = account.profile.birthYear?.toString() ?? '';
 
     // Stored rates are integer MINOR units; the boxes take major units. The
     // conversion back is the only arithmetic this screen does on money, and it
@@ -175,7 +183,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             height: _heightController.text,
             ethnicity: _ethnicityController.text,
             country: _countryCode,
-            relationshipIntent: _intent,
             services: _services.toList(),
             isAvailableToday: _availableToday,
             showOnline: _showOnline,
@@ -184,10 +191,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             // have just cleared it. The repository distinguishes the two.
             primaryService: _primaryService,
             // Sent whatever the badge, because the repository and the route
-            // both gate it -- and on a switch away from Hookup the server
+            // both gate it -- and on a switch of primary service the server
             // clears the column, which is the behaviour a member expects when
             // they change what they are here for.
-            hookupServices: _hookupServices,
+            serviceFeatures: _serviceFeatures,
+            birthYear: _birthYearController.text,
             rates: _rates,
             liveRates: _liveRates,
           );
@@ -314,6 +322,26 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: AppSpacing.xl),
               Text('About you', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: AppSpacing.sm),
+              TextFormField(
+                controller: _birthYearController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Year of birth',
+                  hintText: '1998',
+                  prefixIcon: Icon(Icons.cake_outlined, size: 20),
+                  helperText:
+                      'Your age is shown on your profile, never the year '
+                      'itself. Leave it empty to show no age at all.',
+                  helperMaxLines: 3,
+                ),
+                // Empty is allowed here, unlike at registration: an account
+                // created before the question existed has no year, and forcing
+                // one on the next unrelated save would be inventing a fact
+                // about a person to satisfy a form.
+                validator: (value) =>
+                    (value ?? '').trim().isEmpty ? null : birthYearError(value),
+              ),
+              const SizedBox(height: AppSpacing.lg),
               Row(
                 children: <Widget>[
                   Expanded(
@@ -338,26 +366,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
               const SizedBox(height: AppSpacing.xl),
               Text(
-                'Looking for',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: <Widget>[
-                  for (final intent in RelationshipIntent.values)
-                    ChoiceChip(
-                      label: Text(intent.label),
-                      selected: _intent == intent,
-                      onSelected: (selected) =>
-                          setState(() => _intent = selected ? intent : null),
-                    ),
-                ],
-              ),
-
-              const SizedBox(height: AppSpacing.xl),
-              Text(
                 'What you are here for',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
@@ -370,15 +378,39 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: AppSpacing.sm),
               PrimaryServicePicker(
                 value: _primaryService,
-                onChanged: (id) => setState(() => _primaryService = id),
+                onChanged: (id) => setState(() {
+                  // Clearing rather than keeping: the ids belong to the old
+                  // catalogue and are dropped server-side anyway, so leaving
+                  // them ticked would show a member a selection that will not
+                  // survive their own save.
+                  if (id != _primaryService) _serviceFeatures.clear();
+                  _primaryService = id;
+                }),
               ),
 
-              // The Hookup branch. Mounted only on that selection; switching
-              // away unmounts it and the server clears both the rates and the
-              // list on save, so a profile can never carry an explicit service
-              // list under a badge that says "Chat Buddy". Said plainly here as
-              // well, because a member who does not know that will assume her
-              // list is merely hidden.
+              // What the member offers, under whichever service they chose.
+              //
+              // Every one of the six has its own catalogue since 2026-08-22.
+              // Switching service clears the selection, here and server-side:
+              // the ids belong to the old catalogue and mean nothing under the
+              // new one, so keeping them would leave a Relationship profile
+              // holding Hookup selections.
+              if (featuresFor(_primaryService).isNotEmpty) ...<Widget>[
+                const SizedBox(height: AppSpacing.lg),
+                ServiceFeaturePicker(
+                  primaryService: _primaryService,
+                  selected: _serviceFeatures,
+                  onChanged: (next) => setState(() {
+                    _serviceFeatures
+                      ..clear()
+                      ..addAll(next);
+                  }),
+                ),
+              ],
+
+              // The booking rates stay Hookup-only. They are money for a
+              // meeting arranged over WhatsApp, and the other five services do
+              // not describe a meeting that is charged for.
               if (_wantsHookup) ...<Widget>[
                 const SizedBox(height: AppSpacing.lg),
                 Container(
@@ -388,23 +420,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     border: Border.all(color: AppColors.border),
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
-                  child: HookupDetailsForm(
+                  child: HookupRatesForm(
                     rates: _rates,
                     onRateChanged: (field, value) => _rates[field] = value,
-                    services: _hookupServices,
-                    onServicesChanged: (next) => setState(() {
-                      _hookupServices
-                        ..clear()
-                        ..addAll(next);
-                    }),
                     currencyCode: account.profile.rates
                         .resolvedCurrency(account.profile.countryCode)
                         .code,
-                    // True, unlike the website's Edit Profile, which passes
-                    // false because its own Rates block edits the same columns
-                    // further down the page. This app has no second rates
-                    // control, so leaving it off would make a member's booking
-                    // prices editable at signup and never again.
                   ),
                 ),
               ],

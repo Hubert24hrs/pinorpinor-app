@@ -210,3 +210,86 @@ class ReferralSummary {
         creditsPerReferral: asInt(json['creditsPerReferral']),
       );
 }
+
+/// A recorded request to buy credits, from `/api/credits/purchase`.
+///
+/// ## Why a record exists at all
+///
+/// Card payment is off, so credits are sold over WhatsApp and applied by hand.
+/// That conversation used to leave no trace: a member messaged the business
+/// number, an admin adjusted a wallet from memory, and nothing recorded what was
+/// agreed — reconciling a disputed top-up meant scrolling a chat thread.
+///
+/// The request is now written down **before** the chat opens, and the message
+/// the member sends carries the same reference the admin queue shows. The app
+/// never moves credits: this is a statement of intent, and treating it as
+/// anything more would let anyone credit themselves by tapping a button.
+class CreditPurchase {
+  const CreditPurchase({
+    required this.id,
+    required this.reference,
+    required this.credits,
+    required this.amountNaira,
+    required this.status,
+    this.createdAt,
+    this.approvedAt,
+  });
+
+  final String id;
+
+  /// Short, human-readable, and deliberately drawn from an alphabet with no
+  /// O/0 or I/1 — it gets read aloud and retyped off a phone screen.
+  final String reference;
+
+  final int credits;
+
+  /// Whole Naira, not minor units. Credits are not money and this figure is
+  /// display only; the admin confirms what actually arrived.
+  final int amountNaira;
+
+  /// `PENDING`, `APPROVED` or `REJECTED` as the server spells them.
+  final String status;
+
+  final DateTime? createdAt;
+  final DateTime? approvedAt;
+
+  bool get isPending => status == 'PENDING';
+  bool get isApproved => status == 'APPROVED';
+
+  String get statusLabel => switch (status) {
+    'PENDING' => 'Waiting for confirmation',
+    'APPROVED' => 'Credits added',
+    'REJECTED' => 'Not completed',
+    _ => status,
+  };
+
+  factory CreditPurchase.fromJson(Map<String, dynamic> json) => CreditPurchase(
+    id: asString(json['id']),
+    reference: asString(json['reference']),
+    credits: asInt(json['credits']),
+    amountNaira: asInt(json['amountNaira']),
+    status: asString(json['status'], fallback: 'PENDING'),
+    createdAt: asDateOrNull(json['createdAt']),
+    approvedAt: asDateOrNull(json['approvedAt']),
+  );
+
+  static List<CreditPurchase> listFrom(Object? value) =>
+      asMapList(value).map(CreditPurchase.fromJson).toList(growable: false);
+}
+
+/// The answer to a top-up request: the row, and the message to send.
+class CreditPurchaseResult {
+  const CreditPurchaseResult({required this.purchase, this.whatsappUrl});
+
+  final CreditPurchase purchase;
+
+  /// Built server-side so the message, the stored row and the admin queue can
+  /// never disagree about what was asked for. **Never rebuild it here.**
+  final String? whatsappUrl;
+
+  factory CreditPurchaseResult.fromJson(Map<String, dynamic> json) =>
+      CreditPurchaseResult(
+        purchase: CreditPurchase.fromJson(asMap(json['purchase'])),
+        whatsappUrl: asStringOrNull(json['whatsappUrl']),
+      );
+}

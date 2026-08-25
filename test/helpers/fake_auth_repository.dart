@@ -78,10 +78,12 @@ class FakeAuthRepository extends AuthRepository {
     required Gender gender,
     required String primaryService,
     required bool isAdult,
+    required String birthYear,
     List<String> services = const <String>[],
-    List<String> hookupServices = const <String>[],
+    List<String> serviceFeatures = const <String>[],
     Map<String, String> rates = const <String, String>{},
     String? referralCode,
+    String? whatsappProof,
   }) async {
     joinCalls.add(<String, Object?>{
       'username': username,
@@ -89,9 +91,11 @@ class FakeAuthRepository extends AuthRepository {
       'bio': bio,
       'gender': gender.wire,
       'primaryService': primaryService,
+      'birthYear': birthYear,
       'services': services,
-      'hookupServices': hookupServices,
+      'serviceFeatures': serviceFeatures,
       'rates': rates,
+      'whatsappProof': whatsappProof,
       'isAdult': isAdult,
       'referralCode': referralCode,
     });

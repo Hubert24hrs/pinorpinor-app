@@ -16,8 +16,9 @@ import 'package:pinorpinor_app/core/constants/navigation.dart';
 void main() {
   final websiteNav = File('../pinorpinor/src/lib/navigation.ts');
 
-  List<NavItem> allItems() =>
-      <NavItem>[for (final NavSection s in kNavSections) ...s.items];
+  List<NavItem> allItems() => <NavItem>[
+    for (final NavSection s in kNavSections) ...s.items,
+  ];
 
   group('menu integrity', () {
     test('every entry has a label and an icon', () {
@@ -81,10 +82,7 @@ void main() {
       // surface at all: an app carrying moderation tooling would be an app
       // whose compromise carried it too.
       expect(allItems().where((i) => i.adminOnly), isEmpty);
-      expect(
-        allItems().where((i) => i.href.startsWith('/admin')),
-        isEmpty,
-      );
+      expect(allItems().where((i) => i.href.startsWith('/admin')), isEmpty);
     });
 
     test('account entries are gated behind sign-in', () {

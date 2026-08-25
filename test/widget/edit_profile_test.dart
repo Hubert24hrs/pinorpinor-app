@@ -6,7 +6,6 @@ import 'package:pinorpinor_app/core/network/api_client.dart';
 import 'package:pinorpinor_app/core/network/session_store.dart';
 import 'package:pinorpinor_app/core/providers.dart';
 import 'package:pinorpinor_app/data/models/account.dart';
-import 'package:pinorpinor_app/data/models/enums.dart';
 import 'package:pinorpinor_app/data/repositories/profile_repository.dart';
 import 'package:pinorpinor_app/features/profile/account_providers.dart';
 import 'package:pinorpinor_app/features/profile/edit_profile_screen.dart';
@@ -25,7 +24,7 @@ import '../helpers/pump_app.dart';
 void main() {
   Account account({
     String? primaryService,
-    List<String> hookupServices = const <String>[],
+    List<String> serviceFeatures = const <String>[],
     bool showOnline = true,
   }) => Account.fromJson(<String, dynamic>{
     'user': <String, dynamic>{
@@ -38,7 +37,7 @@ void main() {
         'city': 'Lagos',
         'countryCode': 'NG',
         'primaryService': primaryService,
-        'hookupServices': hookupServices,
+        'serviceFeatures': serviceFeatures,
         'showOnline': showOnline,
       },
     },
@@ -119,7 +118,7 @@ void main() {
     // list under a badge that says "Chat Buddy".
     final repository = await pumpEditor(
       tester,
-      account(primaryService: 'hookup', hookupServices: <String>['massage']),
+      account(primaryService: 'hookup', serviceFeatures: <String>['massage']),
     );
 
     final other = find.text('Chat Buddy');
@@ -133,9 +132,11 @@ void main() {
     final call = repository.calls.single;
     expect(call['primaryService'], 'chat_buddy');
     expect(
-      call['hookupServices'],
-      <String>['massage'],
-      reason: 'sent as held; the repository and the route apply the gate',
+      call['serviceFeatures'],
+      isEmpty,
+      reason:
+          'the picker clears on a switch, because those ids belong to the old '
+          'catalogue and the server drops them anyway',
     );
   });
 
@@ -231,10 +232,10 @@ class _RecordingProfileRepository extends ProfileRepository {
     String? state,
     String? build,
     List<String>? languages,
-    RelationshipIntent? relationshipIntent,
     List<String>? services,
     Object? primaryService = unsetPrimaryService,
-    List<String>? hookupServices,
+    List<String>? serviceFeatures,
+    String? birthYear,
     bool? isAvailableToday,
     bool? isPublic,
     bool? isDiscoverable,
@@ -246,7 +247,8 @@ class _RecordingProfileRepository extends ProfileRepository {
   }) async {
     calls.add(<String, Object?>{
       'primaryService': primaryService,
-      'hookupServices': hookupServices,
+      'serviceFeatures': serviceFeatures,
+      'birthYear': birthYear,
       'showOnline': showOnline,
       'services': services,
       'rates': rates,

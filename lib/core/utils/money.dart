@@ -185,9 +185,7 @@ num? toMajorUnits(int? minorAmount, {String? currencyCode}) {
   final Currency info = currencyByCode(currencyCode);
   if (info.minorDigits == 0) return minorAmount;
   final int scale = _pow10(info.minorDigits);
-  return minorAmount % scale == 0
-      ? minorAmount ~/ scale
-      : minorAmount / scale;
+  return minorAmount % scale == 0 ? minorAmount ~/ scale : minorAmount / scale;
 }
 
 int _pow10(int exponent) {

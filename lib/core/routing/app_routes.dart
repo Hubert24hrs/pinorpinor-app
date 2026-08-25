@@ -38,7 +38,6 @@ class AppRoutes {
   static const manageMedia = '/me/media';
   static const verification = '/verify';
   static const credits = '/credits';
-  static const contactRequests = '/contact-requests';
   static const matches = '/matches';
   static const favorites = '/favorites';
   static const live = '/live';
@@ -70,7 +69,6 @@ class AppRoutes {
     manageMedia,
     verification,
     credits,
-    contactRequests,
     matches,
     // `/api/favorites` requires a session. Without this the screen loads for a
     // signed-out visitor, the request 401s, and `ApiClient` reports that as an

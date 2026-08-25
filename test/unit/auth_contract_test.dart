@@ -66,10 +66,15 @@ void main() {
       expect(
         Validators.phone('08012345678'),
         isNotNull,
-        reason: 'no country code; the backend cannot resolve a country from '
+        reason:
+            'no country code; the backend cannot resolve a country from '
             'this, and discovery scopes on country',
       );
-      expect(Validators.phone('+0123456789'), isNotNull, reason: 'leading zero');
+      expect(
+        Validators.phone('+0123456789'),
+        isNotNull,
+        reason: 'leading zero',
+      );
     });
 
     test('the password floor matches the route', () {

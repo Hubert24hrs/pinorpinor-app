@@ -116,15 +116,14 @@ class LiveScreen extends ConsumerWidget {
                     return ContentContainer(
                       child: GridView.builder(
                         padding: const EdgeInsets.all(AppSpacing.lg),
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: Responsive.of(context).isCompact
-                                  ? 2
-                                  : 3,
-                              crossAxisSpacing: AppSpacing.md,
-                              mainAxisSpacing: AppSpacing.md,
-                              childAspectRatio: 0.72,
-                            ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: Responsive.of(context).isCompact
+                              ? 2
+                              : 3,
+                          crossAxisSpacing: AppSpacing.md,
+                          mainAxisSpacing: AppSpacing.md,
+                          childAspectRatio: 0.72,
+                        ),
                         itemCount: page.profiles.length,
                         itemBuilder: (context, index) {
                           final profile = page.profiles[index];

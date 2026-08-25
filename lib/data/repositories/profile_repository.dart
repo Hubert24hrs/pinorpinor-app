@@ -1,5 +1,5 @@
-import '../../core/constants/hookup_services.dart';
 import '../../core/constants/primary_services.dart';
+import '../../core/constants/service_features.dart';
 import '../../core/constants/services.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
@@ -62,10 +62,10 @@ class ProfileRepository {
     String? state,
     String? build,
     List<String>? languages,
-    RelationshipIntent? relationshipIntent,
     List<String>? services,
     Object? primaryService = unsetPrimaryService,
-    List<String>? hookupServices,
+    List<String>? serviceFeatures,
+    String? birthYear,
     bool? isAvailableToday,
     bool? isPublic,
     bool? isDiscoverable,
@@ -78,13 +78,13 @@ class ProfileRepository {
     // The gate, mirrored on the way out.
     //
     // The server re-derives it from the STORED row, not from this payload, and
-    // that difference matters: a member editing only their explicit list sends
-    // no primaryService at all, and reading the payload alone would wipe the
-    // list they came to edit. So the caller passes the effective value, and when
-    // it is absent the list is sent unchanged for the server to gate.
-    final bool? wantsHookup = primaryService == unsetPrimaryService
+    // that difference matters: a member editing only their feature list sends no
+    // primaryService at all, and reading the payload alone would wipe the list
+    // they came to edit. So the caller passes the effective value, and when it
+    // is absent the list is sent unchanged for the server to gate.
+    final String? effectiveService = primaryService == unsetPrimaryService
         ? null
-        : offersHookup(primaryService as String?);
+        : primaryService as String?;
 
     final body = <String, dynamic>{
       if (displayName != null) 'displayName': displayName.trim(),
@@ -99,8 +99,13 @@ class ProfileRepository {
       if (state != null) 'state': state.trim().isEmpty ? null : state.trim(),
       if (build != null) 'build': build.trim().isEmpty ? null : build.trim(),
       'languages': ?languages,
-      if (relationshipIntent != null)
-        'relationshipIntent': relationshipIntent.wire,
+      // `relationshipIntent` is deliberately absent, and this is the second
+      // column to go the same way after `dateTypes`. The website removed its
+      // four-option dropdown on 2026-08-25 and dropped the key from
+      // `profileUpdateSchema`: nothing rendered it anywhere, and
+      // `primaryService` above asks the same question with answers that are
+      // actually shown. Zod strips unknown keys silently, so continuing to send
+      // it would be an editor for a field that cannot be saved.
       // Whitelisted before sending. The backend does this too; doing it here
       // means an id retired since the screen was built is dropped quietly
       // instead of failing the whole save.
@@ -112,13 +117,21 @@ class ProfileRepository {
       // claim once published.
       if (primaryService != unsetPrimaryService)
         'primaryService': sanitizePrimaryService(primaryService),
-      if (hookupServices != null)
-        'hookupServices': sanitizeHookupServices(
-          hookupServices,
-          // Unknown here means the caller is not touching the primary service,
-          // so the stored one still governs and the server applies it.
-          offersHookup: wantsHookup ?? true,
-        ),
+      if (serviceFeatures != null)
+        'serviceFeatures': effectiveService == null
+            // The caller is not touching the primary service, so the stored one
+            // still governs and only the server can apply the gate. Sent as
+            // held rather than dropped, or a features-only save would clear the
+            // very list the member came to edit.
+            ? serviceFeatures
+            : sanitizeServiceFeatures(
+                serviceFeatures,
+                primaryService: effectiveService,
+              ),
+      // The year the member typed. Nullable server-side, and clearing it is a
+      // real operation, so an empty string is sent as null rather than skipped.
+      if (birthYear != null)
+        'birthYear': birthYear.trim().isEmpty ? null : birthYear.trim(),
       'isAvailableToday': ?isAvailableToday,
       'isPublic': ?isPublic,
       'isDiscoverable': ?isDiscoverable,
@@ -185,6 +198,37 @@ class ProfileRepository {
     return MemberSettings.fromJson(json);
   }
 
+  /// Whether the member is sitting on a temporary password.
+  ///
+  /// An admin can reset a password without learning it (2026-08-22), which sets
+  /// `mustChangePassword`. Until it is cleared, `requireAuth()` refuses
+  /// **everything else on the platform** — so an app that does not check this
+  /// leaves the member staring at failures with no way through. The change
+  /// screen is the one thing allowed in that state.
+  Future<PasswordStatus> passwordStatus() async => PasswordStatus.fromJson(
+    await _api.getJson('/api/account/change-password'),
+  );
+
+  /// Changes the member's own password.
+  ///
+  /// The current password is required **even when a change is being forced**,
+  /// and that is the point of the design: after an admin issues a temporary
+  /// password the only person who can complete this is whoever was given it.
+  /// Skipping the check "because we already forced a change" would let any
+  /// hijacked session lock the real owner out.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _api.postJson(
+      '/api/account/change-password',
+      body: <String, String>{
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+    );
+  }
+
   /// Deactivates the account — `DELETE /api/settings` sets `isActive: false`.
   ///
   /// From that moment `requireAuth()` answers 403 on every call and the profile
@@ -216,4 +260,29 @@ class ProfileRepository {
       body: <String, String>{'password': password},
     );
   }
+}
+
+/// The answer from `GET /api/account/change-password`.
+class PasswordStatus {
+  const PasswordStatus({
+    this.mustChange = false,
+    this.username = '',
+    this.hasPassword = true,
+  });
+
+  /// True after an admin reset. While it holds, every other authenticated call
+  /// is refused server-side.
+  final bool mustChange;
+
+  final String username;
+
+  /// False only for an account with no password at all, which nothing creates
+  /// any more but the column still allows.
+  final bool hasPassword;
+
+  factory PasswordStatus.fromJson(Map<String, dynamic> json) => PasswordStatus(
+    mustChange: asBool(json['mustChangePassword']),
+    username: asString(json['username']),
+    hasPassword: asBool(json['hasPassword'], fallback: true),
+  );
 }

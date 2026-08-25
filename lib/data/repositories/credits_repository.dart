@@ -74,6 +74,37 @@ class CreditsRepository {
   Future<ReferralSummary> referrals() async =>
       ReferralSummary.fromJson(await _api.getJson('/api/referrals'));
 
+  /// Records a request to buy credits, and returns the WhatsApp message to
+  /// send.
+  ///
+  /// **This moves no credits.** It creates a PENDING row; an admin applies the
+  /// balance after the money actually arrives. That ordering is the whole point
+  /// — a request is a statement of intent, and treating it as anything more
+  /// would let anyone credit themselves by tapping a button.
+  ///
+  /// It is also not a purchase inside the app, which is what keeps the app
+  /// outside both stores' billing rules: no payment is taken here, no price is
+  /// charged to a card, and the money moves in a WhatsApp conversation between
+  /// the member and the operator. See `docs/STORE_READINESS.md` before changing
+  /// any of that.
+  Future<CreditPurchaseResult> requestPurchase(int credits) async {
+    final Map<String, dynamic> json = await _api.postJson(
+      '/api/credits/purchase',
+      body: <String, int>{'credits': credits},
+    );
+    return CreditPurchaseResult.fromJson(json);
+  }
+
+  /// The member's own recent requests, so a screen can say "you asked for 500
+  /// credits on Tuesday and it is still pending" rather than leaving them
+  /// wondering whether the message went anywhere.
+  Future<List<CreditPurchase>> purchases() async {
+    final Map<String, dynamic> json = await _api.getJson(
+      '/api/credits/purchase',
+    );
+    return CreditPurchase.listFrom(json['purchases']);
+  }
+
   /// Card checkout is intentionally unavailable from the app.
   ///
   /// Kept as a named, throwing method so the decision is visible where a future

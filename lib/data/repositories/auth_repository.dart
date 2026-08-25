@@ -1,11 +1,12 @@
 import 'package:dio/dio.dart';
 
-import '../../core/constants/hookup_services.dart';
 import '../../core/constants/primary_services.dart';
+import '../../core/constants/service_features.dart';
 import '../../core/constants/services.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/session_store.dart';
+import '../../core/utils/age.dart';
 import '../../core/utils/validators.dart';
 import '../models/enums.dart';
 import '../models/json.dart';
@@ -154,6 +155,80 @@ class AuthRepository {
     return session;
   }
 
+  /// Sends a verification code to a WhatsApp number.
+  ///
+  /// [purpose] is `REGISTRATION` or `PASSWORD_RESET`, and the route treats the
+  /// two very differently on purpose:
+  ///
+  ///   * for a **reset** it answers the same way whether or not an account
+  ///     exists, because a different answer would turn this endpoint into a way
+  ///     of asking "is this number registered here" — on an adult platform that
+  ///     is the disclosure, not the code;
+  ///   * for **registration** it reports real errors, because nobody has an
+  ///     account yet so there is nothing to leak and the caller needs to know.
+  ///
+  /// Rate limited per number and per IP. The two stop different things: the
+  /// first protects a real person from being messaged repeatedly, the second
+  /// stops one client walking a list of numbers.
+  Future<void> sendWhatsAppCode({
+    required String phone,
+    String purpose = 'PASSWORD_RESET',
+  }) async {
+    await _api.postJson(
+      '/api/auth/whatsapp/send',
+      body: <String, String>{'phone': phone.trim(), 'purpose': purpose},
+    );
+  }
+
+  /// Exchanges a code for a proof.
+  ///
+  /// The proof is an HMAC bound to the verification row **and** the phone
+  /// number, so it cannot be forged and cannot be moved to a different number.
+  /// The app holds it only for as long as it takes to hand it back to the reset
+  /// or registration call, and never stores it.
+  Future<String> verifyWhatsAppCode({
+    required String phone,
+    required String code,
+    String purpose = 'PASSWORD_RESET',
+  }) async {
+    final Map<String, dynamic> json = await _api.postJson(
+      '/api/auth/whatsapp/verify',
+      body: <String, String>{
+        'phone': phone.trim(),
+        'code': code.trim(),
+        'purpose': purpose,
+      },
+    );
+    return asString(json['proof']);
+  }
+
+  /// Sets a new password using a WhatsApp proof instead of an emailed link.
+  ///
+  /// **This is the recovery path the app spent a week telling members did not
+  /// exist.** Registration stopped collecting email addresses on 2026-08-14, so
+  /// `/api/forgot-password` had nothing to look anyone up by and a forgotten
+  /// password meant a lost account. The website shipped this on 2026-08-22;
+  /// until 2026-08-25 the app's own join screen still warned that a forgotten
+  /// password could never be recovered, which was false and frightening.
+  ///
+  /// Returns the username the password now belongs to, so the sign-in screen can
+  /// prefill it.
+  Future<String> resetPasswordWithWhatsApp({
+    required String phone,
+    required String proof,
+    required String password,
+  }) async {
+    final Map<String, dynamic> json = await _api.postJson(
+      '/api/auth/whatsapp/reset-password',
+      body: <String, String>{
+        'phone': phone.trim(),
+        'proof': proof,
+        'password': password,
+      },
+    );
+    return asString(json['username']);
+  }
+
   /// Creates a member account through `/api/member/join`.
   ///
   /// **No email address.** The route was rebuilt on 2026-08-14 (migration
@@ -178,16 +253,34 @@ class AuthRepository {
   ///   whitelisted: it is the badge on the member's card and it decides whether
   ///   the hookup block below is stored at all, so an unrecognised value is
   ///   rejected rather than dropped.
+  /// - **`birthYear` must be a year that makes the member 18 or over.**
+  ///   Added 2026-08-21. The full date of birth was dropped on 2026-08-14, which
+  ///   left `isAdult` as the only thing between a minor and an account for eight
+  ///   days; a year restores a server-side bound. It is stored in its own column
+  ///   and **never synthesised into a `birthDate`** — a 1 January would be
+  ///   indistinguishable later from a real date, and real ones exist here.
   /// - **`username` and `password`**, as before.
   ///
-  /// ## The hookup gate
+  /// ## The feature gate
   ///
-  /// `hookupServices` and `rates` are accepted **only** alongside
-  /// `primaryService: 'hookup'`. Posting them under anything else stores an
-  /// empty list and null rates with a 200 - the request is answerable, and the
-  /// stored row simply must never contradict the badge on the card. This client
-  /// applies the same gate before sending, so nothing left behind in a form's
-  /// state can leak into the payload.
+  /// `serviceFeatures` is validated **against the catalogue of the service that
+  /// was chosen**. Every one of the six has its own list as of 2026-08-22, ids
+  /// are prefixed per catalogue so none is valid under two, and anything from
+  /// another catalogue is dropped. `rates` remain Hookup-only.
+  ///
+  /// Posting either under the wrong service stores nothing and still answers
+  /// 200 - the request is answerable, and the stored row simply must never
+  /// contradict the badge on the card. This client applies the same gate before
+  /// sending, so nothing left behind in a form's state can leak into the
+  /// payload.
+  ///
+  /// ## `whatsappProof`
+  ///
+  /// Optional here and required by the route only when `WHATSAPP_OTP_ENABLED`
+  /// is on. It is the HMAC returned by `/api/auth/whatsapp/verify`, bound to the
+  /// verification row and the number, so it cannot be forged or moved to a
+  /// different number. Sent when the app has one; the route decides whether it
+  /// was needed.
   ///
   /// `services` is optional now: registration asks only for the one primary
   /// service, and the 31-entry activity catalogue is offered in Edit Profile
@@ -215,10 +308,12 @@ class AuthRepository {
     required Gender gender,
     required String primaryService,
     required bool isAdult,
+    required String birthYear,
     List<String> services = const <String>[],
-    List<String> hookupServices = const <String>[],
+    List<String> serviceFeatures = const <String>[],
     Map<String, String> rates = const <String, String>{},
     String? referralCode,
+    String? whatsappProof,
   }) async {
     // Checked here as well as server-side so the member is not told "you must
     // confirm you are 18" by a round trip they could have been spared.
@@ -245,14 +340,26 @@ class AuthRepository {
       );
     }
 
-    // The gate, applied on the way out. The server enforces it independently in
-    // four places, so a list sent under a non-hookup badge would simply be
-    // discarded - but a client that keeps hidden answers is a client that
-    // eventually submits one.
+    // Checked here as well so the member is told before a round trip, and with
+    // the backend's own wording so they never see two explanations for one
+    // refusal.
+    final BirthYearCheck yearCheck = validateBirthYear(birthYear);
+    if (yearCheck is BirthYearInvalid) {
+      throw ApiException(
+        kind: ApiErrorKind.validation,
+        message: yearCheck.message,
+        field: 'birthYear',
+      );
+    }
+
+    // The gate, applied on the way out. The server enforces it independently,
+    // so features sent under the wrong service would simply be discarded - but
+    // a client that keeps hidden answers is a client that eventually submits
+    // one.
     final bool wantsHookup = offersHookup(cleanPrimary);
-    final List<String> cleanHookupServices = sanitizeHookupServices(
-      hookupServices,
-      offersHookup: wantsHookup,
+    final List<String> cleanFeatures = sanitizeServiceFeatures(
+      serviceFeatures,
+      primaryService: cleanPrimary,
     );
 
     final json = await _api.postJson(
@@ -263,11 +370,14 @@ class AuthRepository {
         'phone': phone.trim(),
         'bio': bio.trim(),
         'gender': gender.wire,
+        'birthYear': (yearCheck as BirthYearValid).year,
         'primaryService': cleanPrimary,
         'services': cleanServices,
-        'hookupServices': cleanHookupServices,
+        'serviceFeatures': cleanFeatures,
         if (wantsHookup) 'rates': MemberRates.patchBody(rates),
         'isAdult': true,
+        if (whatsappProof != null && whatsappProof.trim().isNotEmpty)
+          'whatsappProof': whatsappProof.trim(),
         if (referralCode != null && referralCode.trim().isNotEmpty)
           'referralCode': referralCode.trim().toUpperCase(),
       },

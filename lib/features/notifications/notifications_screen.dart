@@ -21,8 +21,6 @@ class NotificationsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifications = ref.watch(notificationsProvider);
-    final contactRequests = ref.watch(contactRequestsProvider);
-    final pendingRequests = contactRequests.valueOrNull?.pendingCount ?? 0;
 
     return Scaffold(
       drawer: const AppDrawer(),
@@ -53,9 +51,7 @@ class NotificationsScreen extends ConsumerWidget {
         child: RefreshIndicator(
           color: AppColors.rose,
           onRefresh: () async {
-            ref
-              ..invalidate(notificationsProvider)
-              ..invalidate(contactRequestsProvider);
+            ref.invalidate(notificationsProvider);
           },
           child: notifications.when(
             loading: () => const LoadingView(),
@@ -69,7 +65,7 @@ class NotificationsScreen extends ConsumerWidget {
               ],
             ),
             data: (page) {
-              if (page.notifications.isEmpty && pendingRequests == 0) {
+              if (page.notifications.isEmpty) {
                 return ListView(
                   children: const <Widget>[
                     SizedBox(height: AppSpacing.xxl),
@@ -88,8 +84,6 @@ class NotificationsScreen extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
                   children: <Widget>[
-                    if (pendingRequests > 0)
-                      _ContactRequestBanner(count: pendingRequests),
                     for (final notification in page.notifications)
                       _NotificationTile(notification: notification),
                   ],
@@ -98,40 +92,6 @@ class NotificationsScreen extends ConsumerWidget {
             },
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ContactRequestBanner extends StatelessWidget {
-  const _ContactRequestBanner({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.badgeGoldBg,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.badgeGoldBorder),
-      ),
-      child: ListTile(
-        leading: const Icon(Icons.chat_rounded, color: AppColors.badgeGoldFg),
-        title: Text(
-          count == 1
-              ? '1 contact request waiting'
-              : '$count contact requests waiting',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        subtitle: Text(
-          'Members asking to reach you on WhatsApp. Nothing is shared until '
-          'you accept.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: () => context.push(AppRoutes.contactRequests),
       ),
     );
   }
@@ -190,10 +150,10 @@ class _NotificationTile extends ConsumerWidget {
       context.push(AppRoutes.conversationFor(conversationId));
       return;
     }
-    if (notification.contactRequestId != null) {
-      context.push(AppRoutes.contactRequests);
-      return;
-    }
+    // `contactRequestId` is deliberately not handled any more. Nothing creates
+    // one since 2026-08-23, and the screen that listed them went with the
+    // endpoints; an old notification falls through to the profile below, which
+    // is where a chat is opened now.
     final username = notification.ownerUsername;
     if (username != null) {
       context.push(AppRoutes.profileFor(username));

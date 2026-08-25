@@ -25,10 +25,12 @@ void main() {
   group('Online Now', () {
     testWidgets('renders the members it is given', (tester) async {
       final repository = FakeDiscoveryRepository(
-        onlinePage: FakeDiscoveryRepository.page(<dynamic>[
-          FakeDiscoveryRepository.profile('zainab', presence: 'ONLINE'),
-          FakeDiscoveryRepository.profile('ada', presence: 'TODAY'),
-        ].cast()),
+        onlinePage: FakeDiscoveryRepository.page(
+          <dynamic>[
+            FakeDiscoveryRepository.profile('zainab', presence: 'ONLINE'),
+            FakeDiscoveryRepository.profile('ada', presence: 'TODAY'),
+          ].cast(),
+        ),
       );
 
       await tester.pumpRouted(
@@ -169,9 +171,7 @@ void main() {
       await tester.pumpRouted(
         const VideosScreen(),
         overrides: fakeDiscoveryOverrides(
-          FakeDiscoveryRepository(
-            browsePages: <dynamic>[duplicated].cast(),
-          ),
+          FakeDiscoveryRepository(browsePages: <dynamic>[duplicated].cast()),
         ),
         surfaceSize: TestDevices.tablet,
         stubRoutes: routes,

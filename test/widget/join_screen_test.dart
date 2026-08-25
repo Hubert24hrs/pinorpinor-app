@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pinorpinor_app/core/constants/primary_services.dart';
+import 'package:pinorpinor_app/core/constants/service_features.dart';
 import 'package:pinorpinor_app/features/auth/join_screen.dart';
 import 'package:pinorpinor_app/shared/widgets/brand.dart';
 
@@ -64,6 +65,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// A year that is comfortably an adult whenever this runs. Derived rather
+  /// than hardcoded, so the test does not expire.
+  final String adultYear = '${DateTime.now().year - 30}';
+
+  /// Fills the year of birth, which the route rejects the request without.
+  Future<void> enterYear(WidgetTester tester) async {
+    final field = find.widgetWithText(TextFormField, 'Year of birth');
+    await tester.ensureVisible(field);
+    await tester.pumpAndSettle();
+    await tester.enterText(field, adultYear);
+    await tester.pumpAndSettle();
+  }
+
   /// Taps one of the six primary-service cards by its label.
   Future<void> choose(WidgetTester tester, String label) async {
     final target = find.text(label);
@@ -101,16 +115,22 @@ void main() {
     expect(find.widgetWithText(TextFormField, 'Username'), findsOneWidget);
   });
 
-  testWidgets('warns that a forgotten password cannot be recovered', (
+  testWidgets('tells the truth about recovering a forgotten password', (
     tester,
   ) async {
-    // The single most consequential thing about the new flow: no email is
-    // collected, so /api/forgot-password has nothing to look a member up by.
-    // Saying so after the account exists would be saying so too late.
+    // This screen used to warn that a forgotten password could never be reset.
+    // That was true when registration stopped collecting email addresses, and
+    // stopped being true on 2026-08-22 when WhatsApp recovery shipped.
+    // Frightening somebody off a form with an outdated warning costs signups
+    // for nothing, so the old claim must not come back.
     await pumpJoin(tester, FakeAuthRepository());
 
     expect(
       find.textContaining('no way to reset a forgotten password'),
+      findsNothing,
+    );
+    expect(
+      find.textContaining('reset your password with a code'),
       findsOneWidget,
     );
   });
@@ -241,6 +261,7 @@ void main() {
     await completeAccountStep(tester);
     await completeDetailsStep(tester, bio: 'Jollof and jazz.');
 
+    await enterYear(tester);
     await choose(tester, 'A woman');
     await choose(tester, nonHookup.label);
 
@@ -263,12 +284,14 @@ void main() {
     expect(call['bio'], 'Jollof and jazz.');
     expect(call['gender'], 'WOMAN');
     expect(call['primaryService'], nonHookup.id);
+    expect(call['birthYear'], adultYear);
     expect(call['isAdult'], isTrue);
   });
 
-  testWidgets('the hookup block appears only under that one choice', (
-    tester,
-  ) async {
+  testWidgets('booking rates appear only under hookup', (tester) async {
+    // The rates stayed Hookup-only when the feature list was generalised on
+    // 2026-08-22: the other five services do not describe a meeting that is
+    // charged for.
     await pumpJoin(tester, FakeAuthRepository(), size: TestDevices.iPadPro);
     await completeAccountStep(tester);
     await completeDetailsStep(tester);
@@ -276,25 +299,57 @@ void main() {
     await choose(tester, 'A woman');
     await choose(tester, nonHookup.label);
     expect(find.text('Your booking rates'), findsNothing);
-    expect(find.text('What you offer'), findsNothing);
 
     await choose(tester, hookup.label);
     expect(find.text('Your booking rates'), findsOneWidget);
-    expect(find.text('What you offer'), findsOneWidget);
   });
 
-  testWidgets('switching away from hookup discards what it collected', (
+  testWidgets('every service offers a feature list, not just hookup', (
     tester,
   ) async {
-    // Not cosmetic. Leaving the values in state would post an explicit service
-    // list alongside a primary service of "chat_buddy" — and although the
-    // server discards both in that case, a form that keeps hidden answers is a
-    // form that eventually submits one.
+    // The asymmetry this removed: a Relationship profile used to be a bare
+    // badge while a Hookup profile carried thirty specifics, which made the
+    // explicit list look like the point of the platform.
+    await pumpJoin(tester, FakeAuthRepository(), size: TestDevices.iPadPro);
+    await completeAccountStep(tester);
+    await completeDetailsStep(tester);
+    await choose(tester, 'A woman');
+
+    for (final PrimaryServiceOption option in kPrimaryServices) {
+      await choose(tester, option.label);
+      expect(
+        find.text(featuresHeading(option.id)),
+        findsOneWidget,
+        reason: '${option.label} has no feature list',
+      );
+    }
+  });
+
+  testWidgets('the explicit list warns that it is public', (tester) async {
+    await pumpJoin(tester, FakeAuthRepository(), size: TestDevices.iPadPro);
+    await completeAccountStep(tester);
+    await completeDetailsStep(tester);
+    await choose(tester, 'A woman');
+
+    await choose(tester, nonHookup.label);
+    expect(find.textContaining('This list is explicit'), findsNothing);
+
+    await choose(tester, hookup.label);
+    expect(find.textContaining('This list is explicit'), findsOneWidget);
+  });
+
+  testWidgets('switching service discards what the old catalogue collected', (
+    tester,
+  ) async {
+    // Not cosmetic. Feature ids are prefixed per catalogue, so a selection kept
+    // across a switch is a selection the server will drop — and a form that
+    // keeps hidden answers is a form that eventually submits one.
     final repository = FakeAuthRepository();
     await pumpJoin(tester, repository, size: TestDevices.iPadPro);
     await completeAccountStep(tester);
     await completeDetailsStep(tester);
 
+    await enterYear(tester);
     await choose(tester, 'A woman');
     await choose(tester, hookup.label);
 
@@ -320,8 +375,52 @@ void main() {
 
     final call = repository.joinCalls.single;
     expect(call['primaryService'], nonHookup.id);
-    expect(call['hookupServices'], isEmpty);
+    expect(call['serviceFeatures'], isEmpty);
     expect(call['rates'], isEmpty);
+  });
+
+  testWidgets('the year of birth gates the submit button', (tester) async {
+    // Registration had no server-side age bound at all between 2026-08-14 and
+    // 2026-08-21 — the tickbox was the only thing between a minor and an
+    // account. This is a declaration with a bound, never verification.
+    final repository = FakeAuthRepository();
+    await pumpJoin(tester, repository, size: TestDevices.iPadPro);
+    await completeAccountStep(tester);
+    await completeDetailsStep(tester);
+
+    await choose(tester, 'A woman');
+    await choose(tester, nonHookup.label);
+
+    final tickbox = find.byType(CheckboxListTile);
+    await tester.ensureVisible(tickbox);
+    await tester.pumpAndSettle();
+    await tester.tap(tickbox);
+    await tester.pumpAndSettle();
+
+    final submit = find.widgetWithText(GradientButton, 'Create my account');
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<GradientButton>(submit).onPressed,
+      isNull,
+      reason: 'no year yet, and the route 400s without one',
+    );
+
+    // A year that makes them 10 is refused, not merely unhelpful.
+    final field = find.widgetWithText(TextFormField, 'Year of birth');
+    await tester.ensureVisible(field);
+    await tester.pumpAndSettle();
+    await tester.enterText(field, '${DateTime.now().year - 10}');
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    expect(tester.widget<GradientButton>(submit).onPressed, isNull);
+
+    await enterYear(tester);
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    expect(tester.widget<GradientButton>(submit).onPressed, isNotNull);
+    expect(repository.joinCalls, isEmpty);
   });
 
   testWidgets('never calls join before every step is satisfied', (

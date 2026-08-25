@@ -116,10 +116,12 @@ class AuthController extends StateNotifier<AuthState> {
     required Gender gender,
     required String primaryService,
     required bool isAdult,
+    required String birthYear,
     List<String> services = const <String>[],
-    List<String> hookupServices = const <String>[],
+    List<String> serviceFeatures = const <String>[],
     Map<String, String> rates = const <String, String>{},
     String? referralCode,
+    String? whatsappProof,
   }) async {
     final result = await _repository.join(
       username: username,
@@ -129,10 +131,12 @@ class AuthController extends StateNotifier<AuthState> {
       gender: gender,
       primaryService: primaryService,
       isAdult: isAdult,
+      birthYear: birthYear,
       services: services,
-      hookupServices: hookupServices,
+      serviceFeatures: serviceFeatures,
       rates: rates,
       referralCode: referralCode,
+      whatsappProof: whatsappProof,
     );
 
     // The server normalises the username; sign in with what it stored rather

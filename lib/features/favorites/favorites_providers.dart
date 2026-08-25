@@ -59,8 +59,9 @@ class FavoritesController extends AutoDisposeAsyncNotifier<FavoritesPage> {
 /// seeded from whatever pages have been fetched; a profile not yet seen reads
 /// as not-saved, which is the safe direction — the API upserts, so saving an
 /// already-saved profile is harmless.
-final savedIdsProvider =
-    NotifierProvider<SavedIdsController, Set<String>>(SavedIdsController.new);
+final savedIdsProvider = NotifierProvider<SavedIdsController, Set<String>>(
+  SavedIdsController.new,
+);
 
 class SavedIdsController extends Notifier<Set<String>> {
   @override

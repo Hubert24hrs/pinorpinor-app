@@ -188,12 +188,10 @@ class _AccountBody extends ConsumerWidget {
                     : 'Confirm your email and phone',
                 onTap: () => context.push(AppRoutes.verification),
               ),
-              _MenuItem(
-                icon: Icons.chat_outlined,
-                label: 'Contact requests',
-                subtitle: 'Who has asked to reach you on WhatsApp',
-                onTap: () => context.push(AppRoutes.contactRequests),
-              ),
+              // "Contact requests" was removed on 2026-08-25 with the flow
+              // behind it. Nobody asks to reach anybody any more: a chat is
+              // opened by paying for it, and both sides are charged, so there
+              // is no queue to review and nothing to accept or decline.
               _MenuItem(
                 icon: Icons.favorite_outline_rounded,
                 label: 'Saved profiles',

@@ -7,12 +7,13 @@ import '../data/repositories/discovery_repository.dart';
 import '../data/repositories/media_repository.dart';
 import '../data/repositories/messaging_repository.dart';
 import '../data/repositories/notifications_repository.dart';
+import '../data/repositories/contact_access_repository.dart';
 import '../data/repositories/presence_repository.dart';
+import '../data/repositories/support_repository.dart';
 import '../data/repositories/profile_repository.dart';
 import '../data/repositories/safety_repository.dart';
 import '../data/repositories/dates_repository.dart';
 import '../data/repositories/favorites_repository.dart';
-import '../data/repositories/whatsapp_repository.dart';
 import 'network/api_client.dart';
 import 'network/api_exception.dart';
 import 'network/session_store.dart';
@@ -57,8 +58,14 @@ final notificationsRepositoryProvider = Provider<NotificationsRepository>(
   (ref) => NotificationsRepository(ref.watch(apiClientProvider)),
 );
 
-final contactRepositoryProvider = Provider<ContactRepository>(
-  (ref) => ContactRepository(ref.watch(apiClientProvider)),
+/// Opening a paid WhatsApp chat. Replaces the contact-request flow, whose
+/// endpoints the website removed on 2026-08-23.
+final contactAccessRepositoryProvider = Provider<ContactAccessRepository>(
+  (ref) => ContactAccessRepository(ref.watch(apiClientProvider)),
+);
+
+final supportRepositoryProvider = Provider<SupportRepository>(
+  (ref) => SupportRepository(ref.watch(apiClientProvider)),
 );
 
 final presenceRepositoryProvider = Provider<PresenceRepository>(
@@ -75,10 +82,6 @@ final mediaRepositoryProvider = Provider<MediaRepository>(
 
 final creditsRepositoryProvider = Provider<CreditsRepository>(
   (ref) => CreditsRepository(ref.watch(apiClientProvider)),
-);
-
-final whatsAppRepositoryProvider = Provider<WhatsAppRepository>(
-  (ref) => WhatsAppRepository(ref.watch(apiClientProvider)),
 );
 
 final favoritesRepositoryProvider = Provider<FavoritesRepository>(

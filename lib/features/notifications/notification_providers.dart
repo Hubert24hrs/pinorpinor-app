@@ -124,14 +124,7 @@ final notificationsProvider = FutureProvider.autoDispose<NotificationPage>((
 });
 
 /// Pending WhatsApp contact requests addressed to the member.
-final contactRequestsProvider = FutureProvider.autoDispose<ContactRequestInbox>(
-  (ref) async {
-    return ref.watch(contactRepositoryProvider).inbox();
-  },
-);
-
-/// Requests the member has sent, so they can see what is still pending.
-final sentContactRequestsProvider =
-    FutureProvider.autoDispose<ContactRequestInbox>((ref) async {
-      return ref.watch(contactRepositoryProvider).inbox(box: 'sent');
-    });
+// The contact-request providers were removed on 2026-08-25 along with the
+// endpoints behind them. Opening a chat is a purchase now, resolved at the
+// moment of the tap in ContactAccessRepository, so there is no inbox to poll and
+// nothing pending to count.
