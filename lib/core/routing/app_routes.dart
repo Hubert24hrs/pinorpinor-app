@@ -16,6 +16,11 @@ class AppRoutes {
   static const forgotPassword = '/forgot-password';
   static const resetPassword = '/reset-password';
 
+  /// Resetting a password with a WhatsApp code, which is the only
+  /// recovery path an account created since 2026-08-14 has: no email
+  /// address is collected, so there is nothing to send a link to.
+  static const whatsappReset = '/reset-password/whatsapp';
+
   // Shell tabs
   static const home = '/home';
   static const discover = '/discover';
@@ -38,6 +43,7 @@ class AppRoutes {
   static const manageMedia = '/me/media';
   static const verification = '/verify';
   static const credits = '/credits';
+  static const topUp = '/credits/top-up';
   static const matches = '/matches';
   static const favorites = '/favorites';
   static const live = '/live';
@@ -55,6 +61,8 @@ class AppRoutes {
   static const settingsPreferences = '/settings/preferences';
   static const settingsBlocked = '/settings/blocked';
   static const settingsAccount = '/settings/account';
+  static const settingsPassword = '/settings/password';
+  static const support = '/support';
 
   /// Paths that require a session. Checked in the router's redirect, and
   /// re-checked by the backend on every request these screens make — the client
@@ -69,6 +77,10 @@ class AppRoutes {
     manageMedia,
     verification,
     credits,
+    topUp,
+    // Contact Us posts as the signed-in member: the identity comes from the
+    // session, never the form, or anyone could file complaints as anyone else.
+    support,
     matches,
     // `/api/favorites` requires a session. Without this the screen loads for a
     // signed-out visitor, the request 401s, and `ApiClient` reports that as an
@@ -89,6 +101,7 @@ class AppRoutes {
     join,
     forgotPassword,
     resetPassword,
+    whatsappReset,
   };
 
   static bool isProtected(String location) =>

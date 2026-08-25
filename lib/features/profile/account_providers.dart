@@ -40,6 +40,14 @@ final creditPackagesProvider = FutureProvider.autoDispose<List<CreditPackage>>((
   return ref.watch(creditsRepositoryProvider).packages();
 });
 
+/// The member's own recent top-up requests, so a screen can say "you asked for
+/// 500 credits on Tuesday and it is still pending" rather than leaving them
+/// wondering whether the WhatsApp message went anywhere.
+final creditPurchasesProvider =
+    FutureProvider.autoDispose<List<CreditPurchase>>((ref) async {
+      return ref.watch(creditsRepositoryProvider).purchases();
+    });
+
 final ledgerProvider = FutureProvider.autoDispose<List<LedgerEntry>>((
   ref,
 ) async {

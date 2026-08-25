@@ -22,6 +22,7 @@ class ApiClient {
     required SessionStore sessionStore,
     Dio? dio,
     this.onSessionInvalidated,
+    this.onPasswordChangeRequired,
   }) : // An initializing formal is not possible here: the field is private, and
        // Dart forbids a private named parameter.
        // ignore: prefer_initializing_formals
@@ -67,6 +68,11 @@ class ApiClient {
   final Dio _dio;
   final SessionStore _sessionStore;
   final SessionInvalidated? onSessionInvalidated;
+
+  /// Called when the backend refuses because the member is on a temporary
+  /// password. Every authenticated call answers this way until it is changed,
+  /// so it is reported once, centrally, rather than handled at each call site.
+  final void Function()? onPasswordChangeRequired;
 
   Dio get raw => _dio;
   SessionStore get sessionStore => _sessionStore;
@@ -186,6 +192,14 @@ class ApiClient {
       if (mapped.endsSession) {
         await _sessionStore.clear();
         onSessionInvalidated?.call(mapped);
+      }
+      // Deliberately NOT a session teardown: the session is perfectly valid and
+      // the member is one screen away from using it. Clearing the cookie here
+      // would send somebody who has just been given a temporary password back
+      // to a sign-in form, where the only password they hold is the one they
+      // are being told to replace.
+      if (mapped.kind == ApiErrorKind.passwordChangeRequired) {
+        onPasswordChangeRequired?.call();
       }
       throw mapped;
     }

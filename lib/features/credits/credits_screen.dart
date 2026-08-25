@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/constants/credits.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/routing/app_routes.dart';
 import '../../core/theme/responsive.dart';
 import '../../core/utils/time_ago.dart';
 import '../../data/models/credits.dart';
@@ -148,6 +152,33 @@ class _CreditsBody extends ConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
           ],
 
+          // Stated beside the balance, because it is the one consequence a
+          // member cannot work out from anywhere else: since 2026-08-23 both
+          // sides pay for a chat, so a wallet below the price does not merely
+          // stop them contacting people -- it stops people contacting them.
+          if (wallet.balance < kWhatsAppUnlockCredits)
+            const InlineNotice.warning(
+              message:
+                  'You have fewer than $kWhatsAppUnlockCredits credits, so '
+                  'nobody can open a WhatsApp chat with you. Both sides pay '
+                  '$kWhatsAppUnlockCredits credits when a chat opens.',
+            )
+          else
+            Text(
+              'Opening a WhatsApp chat costs $kWhatsAppUnlockCredits credits, '
+              'and costs the other member the same. Reaching someone you have '
+              'already paid for is free.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+
+          const SizedBox(height: AppSpacing.lg),
+          GradientButton(
+            label: 'Buy credits',
+            icon: Icons.add_rounded,
+            onPressed: () => unawaited(context.push(AppRoutes.topUp)),
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
           Text(
             'Boost your profile',
             style: Theme.of(context).textTheme.headlineSmall,

@@ -27,11 +27,23 @@ final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
 /// the member to sign in from one place instead of at every call site.
 final sessionInvalidatedProvider = StateProvider<ApiException?>((ref) => null);
 
+/// Set when any call answers `PASSWORD_CHANGE_REQUIRED`.
+///
+/// An admin can reset a password without learning it, and until the member sets
+/// a new one **every authenticated endpoint refuses**. So this is not one
+/// screen's error to render — it is the state of the whole app, and the router
+/// reads it in one place rather than each screen guessing what to do with a 403
+/// on something the member owns.
+final passwordChangeRequiredProvider = StateProvider<bool>((ref) => false);
+
 final apiClientProvider = Provider<ApiClient>((ref) {
   final client = ApiClient(
     sessionStore: ref.watch(sessionStoreProvider),
     onSessionInvalidated: (reason) {
       ref.read(sessionInvalidatedProvider.notifier).state = reason;
+    },
+    onPasswordChangeRequired: () {
+      ref.read(passwordChangeRequiredProvider.notifier).state = true;
     },
   );
   ref.onDispose(() => client.raw.close(force: true));

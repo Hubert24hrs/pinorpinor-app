@@ -88,6 +88,23 @@ class Account {
 
   bool get hasPendingMedia => media.any((m) => !m.isApproved);
 
+  /// Whether this member appears in listings at all.
+  ///
+  /// Since 2026-08-24 every public read filters on an **approved**
+  /// `PROFILE_PHOTO` (`HAS_PROFILE_PHOTO` server-side), so a member without one
+  /// is not merely plain-looking in the grid — they are absent from it, from
+  /// discovery, from their own city's count and from their own public profile,
+  /// which 404s for everyone but themselves and staff.
+  ///
+  /// A gallery shot or a clip does not count: it must be a profile photo. The
+  /// owner still sees their own profile, which is the point of that exception —
+  /// somebody who has just registered has to be able to look at it and be told
+  /// what is missing rather than get a 404 for an account they made a minute
+  /// ago.
+  bool get isListable => media.any(
+    (MediaItem m) => m.mediaType == MediaType.profilePhoto && m.isApproved,
+  );
+
   /// A rough completeness score for the dashboard nudge. Purely cosmetic — no
   /// access decision anywhere depends on it.
   double get completeness {
@@ -96,7 +113,10 @@ class Account {
       (profile.bio ?? '').trim().length >= 20,
       (profile.city ?? '').isNotEmpty,
       profile.countryCode != null,
-      media.any((m) => m.mediaType == MediaType.profilePhoto),
+      // Not "has any media": a gallery shot does not make anyone listable, and
+      // completeness that says 100% while the member is invisible is worse than
+      // no number at all.
+      isListable,
       // The primary service replaced the deprecated dateTypes column here: it
       // is the one field a member must choose for their card to carry a badge.
       profile.primaryService != null,

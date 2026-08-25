@@ -261,11 +261,15 @@ const List<NavSection> kNavSections = <NavSection>[
         href: '/faq',
         kind: NavKind.website,
       ),
+      // Native since 2026-08-25: `POST /api/support` files a message against
+      // the signed-in account, which is a better answer than opening a web page
+      // the member would have to sign into again.
       NavItem(
         label: 'Contact & Support',
         icon: Icons.support_agent_rounded,
         href: '/contact',
-        kind: NavKind.website,
+        kind: NavKind.native,
+        route: AppRoutes.support,
       ),
       // Native rather than [NavKind.website]. The website's /app page tells a
       // browser visitor there is nothing to download yet; opening it from

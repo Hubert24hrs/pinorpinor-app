@@ -16,6 +16,16 @@ enum ApiErrorKind {
   /// 403 with `code: ACCOUNT_SUSPENDED` — banned or deactivated.
   accountSuspended,
 
+  /// 403 with `code: PASSWORD_CHANGE_REQUIRED` — an admin reset this password
+  /// and the member is sitting on a temporary one.
+  ///
+  /// **Every other authenticated call answers this way** until the change is
+  /// done, so it is not one screen's error: it is the whole app, and the only
+  /// useful response is to send the member to the change-password screen.
+  /// Treating it as an ordinary 403 would show "you don't have access to that"
+  /// on a profile they own.
+  passwordChangeRequired,
+
   /// 403 without a suspension code.
   forbidden,
 
@@ -140,10 +150,11 @@ class ApiException implements Exception {
     final kind = switch (status) {
       401 => ApiErrorKind.unauthorized,
       402 => ApiErrorKind.paymentRequired,
-      403 =>
-        serverCode == 'ACCOUNT_SUSPENDED'
-            ? ApiErrorKind.accountSuspended
-            : ApiErrorKind.forbidden,
+      403 => switch (serverCode) {
+        'ACCOUNT_SUSPENDED' => ApiErrorKind.accountSuspended,
+        'PASSWORD_CHANGE_REQUIRED' => ApiErrorKind.passwordChangeRequired,
+        _ => ApiErrorKind.forbidden,
+      },
       404 => ApiErrorKind.notFound,
       409 => ApiErrorKind.conflict,
       422 || 400 => ApiErrorKind.validation,
@@ -169,6 +180,8 @@ class ApiException implements Exception {
     ApiErrorKind.network => "You're offline. Reconnect and try again.",
     ApiErrorKind.unauthorized => 'Please sign in to continue.',
     ApiErrorKind.accountSuspended => 'This account has been suspended.',
+    ApiErrorKind.passwordChangeRequired =>
+      'Please choose a new password before continuing.',
     ApiErrorKind.forbidden => "You don't have access to that.",
     ApiErrorKind.notFound => 'Not found.',
     ApiErrorKind.conflict => 'That is already taken.',

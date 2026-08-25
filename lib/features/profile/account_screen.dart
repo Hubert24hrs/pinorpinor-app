@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -137,6 +138,28 @@ class _AccountBody extends ConsumerWidget {
 
           if (!account.fullyVerified) ...<Widget>[
             _VerifyPrompt(account: account),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+
+          // The most consequential thing this screen can tell a member, so it
+          // sits above everything else. Since 2026-08-24 a member with no
+          // approved profile photo is absent from every listing and their own
+          // public profile 404s for everybody else - which reads as a broken
+          // account rather than a missing photo, and they would have no way to
+          // find that out.
+          if (!account.isListable) ...<Widget>[
+            const InlineNotice.warning(
+              message:
+                  'You have no profile picture, so your profile is not shown '
+                  'to anyone. Add one and you appear in browsing straight '
+                  'away.',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+              label: const Text('Add a profile picture'),
+              onPressed: () => unawaited(context.push(AppRoutes.manageMedia)),
+            ),
             const SizedBox(height: AppSpacing.lg),
           ],
 

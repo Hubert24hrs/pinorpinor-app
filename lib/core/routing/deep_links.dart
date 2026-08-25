@@ -68,6 +68,9 @@ class DeepLinks {
       case 'credits':
         return AppRoutes.credits;
 
+      case 'support':
+        return AppRoutes.support;
+
       case 'settings':
         return AppRoutes.settings;
 

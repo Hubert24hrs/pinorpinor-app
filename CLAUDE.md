@@ -5,7 +5,7 @@
 > codebase. Trust the source over this file where they disagree, and update this
 > file when they do.
 
-Last verified: **2026-08-22**. Analyzer clean, **336 tests passing**, debug APK
+Last verified: **2026-08-25**. Analyzer clean, **396 tests passing**, debug APK
 builds. Local: `C:\Users\HP\.gemini\antigravity-ide\scratch\pinorpinor-app`.
 Repository: `https://github.com/Hubert24hrs/pinorpinor-app`, branch `main`.
 
@@ -13,45 +13,50 @@ Repository: `https://github.com/Hubert24hrs/pinorpinor-app`, branch `main`.
 
 Everything is committed and pushed; the working tree is clean.
 
-**The website changed underneath the app three times now, and every one of them
-broke registration without breaking a build.** This is the single most important
-fact about working on this repository, and the reason half the test suite reads
-the website's TypeScript.
+**The website changes contracts under this app, and the app keeps building.**
+Four times in eleven days now. This is the single most important fact about
+working on this repository, and the reason a growing share of the test suite
+reads the website's own TypeScript.
 
 | When | What the website did | What the app did about it |
 | --- | --- | --- |
-| 2026-08-14 | `authorize()` began reading `credentials.identifier`; `/api/member/join` was rebuilt to six fields | Every sign-in answered 401 and every registration 400, until fixed |
-| 2026-08-21 | Registration required `gender` **and** `primaryService` | Registration answered 400 on every attempt, until fixed 2026-08-22 |
+| 2026-08-14 | `authorize()` began reading `credentials.identifier`; `/api/member/join` rebuilt to six fields | Every sign-in answered 401 and every registration 400 |
+| 2026-08-21 | Registration required `gender` **and** `primaryService` | Registration answered 400 on every attempt |
+| 2026-08-22 | `hookupServices` renamed `serviceFeatures`; `birthYear` required | Registration 400 again, and every feature list saved into nothing |
+| 2026-08-23 | Contact requests **deleted**, replaced by a paid unlock | Three endpoints the app called stopped existing; the inbox screen polled a 404 |
 
-Each time: analyzer clean, every test green, APK built and installed. **A client
-and a server can agree at compile time and disagree at run time, and only a
-device or a test that reads the other side's source tells you.**
+Each time: analyzer clean, every test green, APK built and installed.
 
-`test/unit/join_contract_test.dart` now reads the real route and fails when it
-gains a field this app does not send. It was verified to catch the 2026-08-21
-break by removing `gender` from the sent set and watching it fail.
+**The 2026-08-22 break was the first one caught by a test rather than by a
+member.** `test/unit/join_contract_test.dart` reads the real route file and
+failed naming `birthYear`. That is the pattern worth extending: where a contract
+can be read off the website's source, read it, and pin it with a test that reads
+the same file.
 
-### What landed 2026-08-22 — the 2026-08-20/21 website release, mirrored
+### Start every session here
 
-The website shipped four commits the app knew nothing about. All are now
-mirrored.
+```
+git -C ../pinorpinor log --oneline -15    # what changed under you
+flutter test                               # what it broke
+```
+
+That pair is what surfaced the last two releases. The website shipped **twenty
+commits in the three days** before 2026-08-25, so this is not a formality.
+
+### What landed 2026-08-25 — the 2026-08-22/25 website releases, mirrored
 
 | Website change | What the app does now |
 | --- | --- |
-| **Men can register** (`gender` required, `WOMAN` or `MAN`) | The join form asks again. `role` and `interestedIn` are still derived server-side from a closed table — the app only sends the answer |
-| **One primary service, required** | `lib/core/constants/primary_services.dart`, six ids. Asked at signup, editable in Edit Profile, and the headline badge on every card |
-| **The Hookup gate** | `lib/core/constants/hookup_services.dart`, 36 ids behind `primaryService == 'hookup'`. Gated on read, on write, and in the model |
-| **Live sessions, priced in credits** | `lib/core/constants/live_sessions.dart` + `MemberLiveSessions`. Displayed on profiles, editable, and honest that no session can be started |
-| **`POST /api/presence`** | `PresenceHeartbeat` in `lib/app.dart`, beating every two minutes in the foreground |
-| **`showOnline`** | A switch in Edit Profile; `Presence?` is now nullable throughout, and null is not `AWAY` |
-| **`GET /api/referrals`** | The credits screen's referral panel, with the share link and credits actually earned |
-| **Nothing over a member's face** | The card's four top-corner badges are gone; the primary service, presence dot and WhatsApp glyph live in the bottom strip |
-| **`/app` — "Get the App"** | A native screen. The website's version tells a browser visitor there is nothing to download, which is not the question a member holding the app is asking |
-
-**Two things men cannot do**, and both are the website's rules, not oversights:
-`/api/upload/presigned-url` still answers 403 to any role but `WOMAN`, so a man
-who registers has no way to add a photo; and anonymous visitors still see women
-only, so a man's profile is visible to signed-in members only.
+| **`birthYear` required at registration** | Asked as one box on the service step, validated with the route's own bounds. Never synthesised into a `birthDate` |
+| **`hookupServices` → `serviceFeatures`**, generalised to all six services | `lib/core/constants/service_features.dart`. Ids prefixed per catalogue, heading differs per service, switching service clears the column |
+| **Contact requests deleted; a chat is now bought** | `ContactAccessRepository`. 100 credits each side, all or nothing. The inbox screen, its route and its menu entry are gone |
+| **`relationshipIntent` dropped from the schema** | No longer sent. Second column after `dateTypes` to be silently discarded by zod |
+| **Password reset over WhatsApp** | `features/auth/whatsapp_reset_screen.dart`, three steps. The join screen's "there is no way to reset" warning is gone, because it was false |
+| **Sign in with a phone number** | The field accepts a username, an email **or** a number in any written form. Nothing is normalised client-side |
+| **Admin password reset → `mustChangePassword`** | `PASSWORD_CHANGE_REQUIRED` is its own error kind, and the router pins the member to the change screen until it clears |
+| **Credit top-ups with an admin queue** | `features/credits/top_up_screen.dart`. Records the request, then opens the WhatsApp message the server built |
+| **Contact Us** | `features/support/support_screen.dart`, posting as the signed-in member |
+| **A profile picture is compulsory to be listed** | The account screen warns when there is none, and registration ends at the photo step rather than at verification |
 
 ### Landed 2026-08-20
 
@@ -159,13 +164,11 @@ still renders a label instead of a slug.
 
 ---
 
-## The primary service, and the gate behind it
+## The primary service, and the list under it
 
-Added on the website 2026-08-21, mirrored in
+Added on the website 2026-08-21 and mirrored in
 `lib/core/constants/primary_services.dart`. **Exactly one of six ids, required at
-registration**, and it is the headline fact on a member card — it replaced the
-two badges that used to sit at the top of every card and cover the member's face
-while saying nothing a visitor could act on.
+registration**, and it is the headline fact on a member card.
 
 **Null is a real state and must survive.** Every account created before
 2026-08-21 has none, and renders **no badge**. Never substitute a default:
@@ -175,19 +178,65 @@ why `ProfileRepository.updateProfile` takes `Object? primaryService` against the
 `unsetPrimaryService` sentinel — absent and null are different requests — and why
 the picker shows nothing selected rather than preselecting an option.
 
-Choosing `hookup` unlocks two things and **nothing else may carry them**: the
-booking rates and the 36-entry explicit list in
-`lib/core/constants/hookup_services.dart`. The server enforces that in four
-places; the app applies it in three more, on the way out of the join screen, in
-the repository, and on the way in to `ProfileSummary`. That is not belt and
-braces for its own sake — it is the lesson from August, when the website's
-screens stopped showing this list and four public endpoints carried on
-publishing the whole thing as JSON to anonymous callers. **Removing a catalogue
-from the screen is not removing it.**
+### Every service has a feature list now
 
-Posting the list under any other badge is a **200**, not an error: the request is
-answerable and the stored row simply must never contradict the badge. So a client
-that leaks it gets no feedback at all.
+Until 2026-08-22 only Hookup had one. A profile saying "Relationship" told a
+visitor nothing beyond the word while a Hookup profile carried thirty specifics,
+which made the explicit list look like the point of the platform rather than one
+option on it. `lib/core/constants/service_features.dart` mirrors all six.
+
+The column was renamed `hookupServices` → **`serviceFeatures`** in the same
+release. The app went on sending the old key, which zod strips silently, so a
+member ticked a list, saved, and watched it vanish behind a 200.
+
+**Ids are prefixed per catalogue** (`rel_`, `din_`, `fwb_`, `chat_`, `open_`),
+so no id can be valid under two services. Without that, "travel" would be
+legitimate under three of them and a member switching service would keep a
+selection that only collided by accident.
+`test/unit/service_features_test.dart` fails if any id ever belongs to two.
+
+**Switching primary service clears the column** — in the picker and again
+server-side. The ids belong to the old catalogue and mean nothing under the new
+one, so keeping them would leave a Relationship profile holding Hookup ids that
+any read path forgetting to check would publish. That is the lesson from August,
+when the website's screens stopped showing the explicit list and four public
+endpoints carried on publishing it as JSON. **Removing a catalogue from the
+screen is not removing it.**
+
+The heading differs per service on purpose (`featuresHeading`): what someone
+*offers* under Hookup, what they *want* under Relationship. One generic word over
+both makes the Relationship list read as a menu.
+
+Booking rates stay **Hookup-only**. The other five do not describe a meeting that
+is charged for.
+
+## A chat costs credits, and both sides pay
+
+Until 2026-08-23 contact was a **consent** flow: ask, wait, the member accepts.
+The website deleted those routes and replaced them with a price, so
+`/api/contact-requests` and `/api/profile/[u]/contact-request` are 404s. Every
+screen the app had built on them was showing a queue that could never fill.
+
+Opening a chat costs the sender **100 credits and the member being contacted
+100**, in one transaction: if either wallet is short, neither is charged. Two
+consequences follow that a member cannot work out from anywhere else, so the app
+states both — on the profile, and beside the balance on the credits screen:
+
+- a balance below the price makes a member **unreachable**, and
+- credits leave a wallet **passively**, by being contacted.
+
+**The two refusals are not the same thing**, and `ContactAccessFailure` keeps
+them apart:
+
+- **402 `INSUFFICIENT_CREDITS`** — the viewer is short. Names the price and their
+  own balance, and offers a top-up, because that is something they can act on.
+- **409 `TARGET_CANNOT_RECEIVE`** — the other side cannot cover their half.
+  Carries **no balance and no blame**: the viewer did nothing wrong and has no
+  business learning what is in somebody else's wallet. Pass the server's wording
+  through; never rewrite it into "they have no credits".
+
+`test/unit/contact_access_test.dart` fails if a shortfall ever becomes derivable
+from the 409.
 
 ## Credits are not money, and they never share a column
 
@@ -356,12 +405,14 @@ answer without a round trip; it is never the thing enforcing them.
 
 | Rule | Where it really lives |
 | --- | --- |
-| 18+ is an assertion, not a date | `/api/member/join` requires `isAdult === true`. `birthDate` stays **null** for every account created since 2026-08-14, so nothing downstream may assume an age exists |
+| 18+ is an assertion **plus a year** | `/api/member/join` requires `isAdult === true` **and** a `birthYear` that makes the member 18. `birthDate` stays null and must never be synthesised from the year. Still a declaration, never verification |
 | Registration accepts women **and men** | `/api/member/join` requires `gender`, mapped through a closed server-side table since 2026-08-21. It used to force `WOMAN` |
 | One primary service, required, from a fixed list | `sanitizePrimaryService`. Null is a real state for older accounts and renders no badge |
-| The explicit list and booking rates need `primaryService: 'hookup'` | Enforced in four places server-side. Posting them under any other badge is a **200** that stores nothing |
+| Feature ids are validated against **the chosen service's** catalogue | `sanitizeServiceFeatures`. Ids are prefixed per catalogue, and switching service clears the column |
+| Booking rates still need `primaryService: 'hookup'` | The other five services do not describe a meeting that is charged for |
 | The country comes from the phone number | `countryFromPhone`. A number that does not resolve leaves `countryCode` null — and discovery scopes on it, so the member is listed nowhere |
-| Login accepts a username **or** an email | `authorize()` splits on the presence of an `@` |
+| Login accepts a username, an email **or a WhatsApp number** | `authorize()` splits on an `@`, then on `phoneMatchSuffix()`. Every written form of a number works, because the server matches significant digits from the **end** rather than rebuilding E.164 |
+| An ambiguous number is **refused**, never resolved | `users.phone` is not unique, so the lookup caps at two and anything but exactly one match returns null. Signing someone into whichever account came back first would be account takeover |
 | Anonymous callers only ever see women | `resolveVisibleGenders()` — hard-limited, ignores client input. Signed-in members see whatever their stored `interestedIn` allows, which is how men became visible at all |
 | Only lady accounts may upload media | `/api/upload/presigned-url` returns 403 otherwise — **still true after men could register**, so a man who joins has no way to add a photo |
 | Discovery never crosses borders | `resolveViewerCountry` pins a signed-in member |
@@ -374,9 +425,12 @@ answer without a round trip; it is never the thing enforcing them.
 | Live-session prices are whole credits, not money | `parseLiveSessionInput`, separate columns, separate payload key |
 | Referrals report a count and a total, never who | `/api/referrals`. A referral list is a record of who knows whom |
 | Favourites are private and one-directional | `/api/favorites`. The saved member is never told, and no endpoint would tell them |
-| Phone numbers never published; WhatsApp needs an ACCEPTED `ContactRequest` | `/api/profile/[u]/whatsapp` |
+| Phone numbers never published; a WhatsApp chat is **bought** | `/api/profile/[u]/whatsapp` charges both sides 100 credits in one transaction. The consent flow was deleted on 2026-08-23 |
+| Only members with an approved profile photo are listed | `HAS_PROFILE_PHOTO`, applied to all twelve public reads. A member without one is absent everywhere and their public profile 404s — the owner and staff still see it |
+| A forgotten password **is** recoverable | `/api/auth/whatsapp/*`, since 2026-08-22. The app said otherwise for eleven days |
+| An admin can reset a password without learning it | `mustChangePassword` then refuses every other authenticated call until it is changed |
 | Deleting an account erases bucket objects **before** rows | `/api/account`. The other order strands every photo |
-| Credits sold over WhatsApp; card payment off (`503`) | `PAYSTACK_ENABLED=false` |
+| Credits sold over WhatsApp; card payment off (`503`) | `PAYSTACK_ENABLED=false`. A top-up is **recorded first** (`/api/credits/purchase`) so the reference in the member's message matches the admin queue |
 
 **`ProfilePage.pinned`** is what tells the UI whether to offer a country picker.
 For a signed-in member the backend ignores the `country` parameter, so showing
@@ -410,11 +464,26 @@ reading the reason.
 `/api/swipe`, which the website still does not expose. Favourites, the online
 feed and date proposals joined it on 2026-08-20.)*
 
+**Gone rather than absent: the contact-request inbox.** The screen, its route,
+its account-menu entry and its providers were deleted on 2026-08-25 with the
+endpoints behind them. Nobody asks to reach anybody now — a chat is opened by
+paying for it — so there is no queue to review and nothing to accept or decline.
+Old notifications that carry a `contactRequestId` fall through to the member's
+profile, which is where a chat is opened.
+
 **Also deliberately absent: a media visibility toggle.** `media.isPublic` is a
 real column and the owner is meant to control it, but no client endpoint sets
 it — only admin paths do. The app reads it and does not offer a switch, because
 a control that silently fails is worse than no control. If the website adds
 `PATCH /api/media/[id]`, this becomes a ten-line change.
+
+**And no `relationshipIntent` editor.** The website removed its four-option
+dropdown on 2026-08-25 and dropped the key from `profileUpdateSchema`. Nothing
+rendered the column anywhere — not the card, not the profile, not discovery — so
+it was a question that wasted a member's time and produced a value nothing could
+show them. `primaryService` asks the same thing with answers that are visible.
+The column is kept, exactly as `dateTypes` is, because it holds real answers real
+members gave.
 
 **And no "who saved me".** The backend has no endpoint for it, by design.
 Favourites are one-directional and the saved member is never told; being able
@@ -449,7 +518,7 @@ licences included), not fetched at runtime.
 
 ```bash
 flutter analyze     # expect: No issues found
-flutter test        # expect: 336 passing
+flutter test        # expect: 396 passing
 flutter build apk --debug
 ```
 
@@ -462,7 +531,7 @@ Tests found three genuine defects so far: two RenderFlex overflows (brand mark,
 sign-in footer) and the unawaited push. Keep the overflow assertions — they are
 cheap and they work.
 
-**Five tests read the website's own source**, and they are the only defence
+**Seven tests read the website's own source**, and they are the only defence
 against the failure mode that has now broken this app three times:
 
 | Test | Reads | Fails when |
@@ -470,7 +539,8 @@ against the failure mode that has now broken this app three times:
 | `join_contract_test.dart` | `api/member/join/route.ts` | the route can reject a field this app does not send |
 | `navigation_test.dart` | `lib/navigation.ts` | the menu gains an entry |
 | `deep_links_test.dart` | `src/app/` | a section resolves to a profile lookup for its own slug |
-| `services_catalogue_test.dart`, `primary_services_test.dart`, `hookup_services_test.dart`, `live_sessions_test.dart` | the matching `src/lib/*.ts` | any catalogue drifts |
+| `services_catalogue_test.dart`, `primary_services_test.dart`, `hookup_services_test.dart`, `live_sessions_test.dart`, `service_features_test.dart` | the matching `src/lib/*.ts` | any catalogue drifts, or an id becomes valid under two services |
+| `credits_test.dart` | `credits.ts`, `credit-purchase.ts` | a price the app quotes stops matching the one the server charges |
 
 They **skip** when the sibling website checkout is absent, so the app stays
 buildable alone. That is a deliberate hole: CI running only this repository
@@ -488,7 +558,7 @@ reports on a live platform with real members would be worse than none.
 | Area | Status |
 | --- | --- |
 | `flutter analyze` | Clean |
-| `flutter test` | 336 passing |
+| `flutter test` | 396 passing |
 | Debug APK | Builds (122 MB, arm64) |
 | Release `.aab` | **Not run** — needs the owner's `android/key.properties` |
 | iOS build | **Blocked** — needs macOS + Xcode |
@@ -496,7 +566,10 @@ reports on a live platform with real members would be worse than none.
 | On device — launch | **One crash found and fixed** (wrong `MainActivity` package). The corrected build has **not yet been confirmed to launch** |
 | Emulator | **Unavailable.** The machine's only AVD cannot start: `x86_64 emulation currently requires hardware acceleration` — the hypervisor driver is not installed |
 | Signed-in API flows | **Not verified against a live account.** Written against contracts read from the website source |
-| Registration (gender + primary service) | **Fixed 2026-08-22, not run.** The payload is pinned by `join_contract_test.dart` against the real route, which is the strongest evidence available without an account |
+| Registration (gender, primary service, birth year) | **Fixed 2026-08-25, not run.** The payload is pinned by `join_contract_test.dart` against the real route, which is the strongest evidence available without an account |
+| Paid contact (402/409) | **Verified by test** against fabricated responses. No real credit has ever been spent from this app |
+| WhatsApp password reset | **Not run.** No code has been received on a device; the three-step shape is read from the routes |
+| Forced password change | **Not run.** Needs an admin to reset a real account |
 | Sign-in field name | **Fixed 2026-08-14, still not verified** against a live account |
 | The hookup gate | **Verified by test** on the client side only. The server's own four gates were verified by the website's session, not by this one |
 | Presence heartbeat | **Verified by test** (interval, foreground-only, signed-out silence). The 204 has never been received from production |
@@ -626,19 +699,30 @@ In priority order:
    front of `/api/upload/confirm`.
 4. Owner: approve some real member media so discovery is not empty, and set the
    SMS provider key so phone verification can complete.
-5. **Watch the website for the next release.** It has changed under this app
-   three times in nine days, and each time the app kept building. The cheapest
-   check is `git -C ../pinorpinor log --oneline -10` followed by
-   `flutter test`, which is exactly what surfaced the 2026-08-21 break: the menu
-   parity test failed on "Get the App" and everything else was found by reading
-   the four commits behind it.
+5. **Watch the website, every session.** It has changed contracts under this app
+   four times in eleven days, and shipped twenty commits in the three days
+   before 2026-08-25 alone. The check costs a minute:
 
-   Two things the website is carrying that the app cannot see yet:
-   **referral farming** (signup collects no email, the phone is never verified
-   and `users.phone` is not unique, so a fake referral costs one invented
-   username) and **men who cannot upload a photo**, because
-   `/api/upload/presigned-url` is still `WOMAN`-only. Both are the owner's calls,
-   not app changes.
+   ```
+   git -C ../pinorpinor log --oneline -15
+   flutter test
+   ```
+
+   That is what caught `birthYear`, and the failure named the field.
+
+   Two things the website is carrying that the app cannot fix:
+   **referral farming** (signup collects no email, the phone is not verified
+   unless `WHATSAPP_OTP_ENABLED` is on, and `users.phone` is not unique, so a
+   fake referral costs one invented username) and **men who cannot upload a
+   photo**, because `/api/upload/presigned-url` is still `WOMAN`-only — which
+   now also means a man can never be listed, since every listing filters on an
+   approved profile photo. Both are the owner's calls.
+
+6. **Two flows are written and completely unexercised**: the WhatsApp password
+   reset and the forced password change. Both are reachable, both are pinned to
+   the routes by reading them, and neither has ever received a code or a 403 from
+   production. They are the first things to try on a real device after
+   registration.
 
 *(Active-filter chips on Discover — the second aura pattern — are **done**;
 `_ActiveFilterChips` in `discover_screen.dart`, one chip per filter with its own

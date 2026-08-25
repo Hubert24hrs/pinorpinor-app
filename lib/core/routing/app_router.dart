@@ -7,8 +7,10 @@ import '../../features/auth/auth_controller.dart';
 import '../../features/auth/join_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/password_screens.dart';
+import '../../features/auth/whatsapp_reset_screen.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/credits/credits_screen.dart';
+import '../../features/credits/top_up_screen.dart';
 import '../../features/discovery/discover_screen.dart';
 import '../../features/discovery/swipe_screen.dart';
 import '../../features/home/home_screen.dart';
@@ -26,8 +28,11 @@ import '../../features/profile/account_screen.dart';
 import '../../features/profile/edit_profile_screen.dart';
 import '../../features/profile/profile_detail_screen.dart';
 import '../../features/settings/account_settings_screen.dart';
+import '../../features/settings/change_password_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/support/support_screen.dart';
 import '../../features/verification/verification_screen.dart';
+import '../providers.dart';
 import 'app_routes.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -69,6 +74,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!auth.isSignedIn && AppRoutes.isProtected(location)) {
         final target = Uri.encodeComponent(state.uri.toString());
         return '${AppRoutes.login}?redirect=$target';
+      }
+
+      // An admin has reset this password. Everything else on the platform
+      // answers 403 until a new one is set, so anywhere but here is a screen
+      // full of refusals.
+      if (auth.isSignedIn &&
+          ref.read(passwordChangeRequiredProvider) &&
+          location != AppRoutes.settingsPassword) {
+        return AppRoutes.settingsPassword;
       }
 
       if (auth.isSignedIn && AppRoutes.isAuthOnly(location)) {
@@ -197,6 +211,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const VideosScreen(),
       ),
       GoRoute(
+        path: AppRoutes.whatsappReset,
+        builder: (context, state) => const WhatsAppResetScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.support,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SupportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsPassword,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.topUp,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const TopUpScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.getTheApp,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const GetTheAppScreen(),
@@ -258,7 +291,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 /// Bridges Riverpod's auth state to `GoRouter.refreshListenable`.
 class _AuthRefreshNotifier extends ChangeNotifier {
   _AuthRefreshNotifier(Ref ref) {
-    _removeListener = ref.listen<AuthState>(authControllerProvider, (
+    _removeAuthListener = ref.listen<AuthState>(authControllerProvider, (
       previous,
       next,
     ) {
@@ -269,13 +302,25 @@ class _AuthRefreshNotifier extends ChangeNotifier {
         notifyListeners();
       }
     }).close;
+
+    // A forced password change is the second thing that changes where a
+    // signed-in member is allowed to be. Without this the flag would flip and
+    // the redirect would not re-run until some unrelated navigation happened.
+    _removePasswordListener = ref.listen<bool>(passwordChangeRequiredProvider, (
+      previous,
+      next,
+    ) {
+      if (previous != next) notifyListeners();
+    }).close;
   }
 
-  late final VoidCallback _removeListener;
+  late final VoidCallback _removeAuthListener;
+  late final VoidCallback _removePasswordListener;
 
   @override
   void dispose() {
-    _removeListener();
+    _removeAuthListener();
+    _removePasswordListener();
     super.dispose();
   }
 }

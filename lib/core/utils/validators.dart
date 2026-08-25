@@ -178,24 +178,35 @@ class Validators {
     return null;
   }
 
-  /// The sign-in field, which accepts a username *or* an email address.
+  /// The sign-in field, which accepts a username, an email address **or a
+  /// WhatsApp number**.
   ///
-  /// The backend splits the two on the presence of an "@" (see `authorize()`
-  /// in the website's `src/lib/auth.ts`), so this validates whichever form the
-  /// member typed rather than forcing one. Validating it as an email would
-  /// lock out every account created since 2026-08-14, none of which has an
-  /// address at all.
+  /// The backend splits the three apart itself (see `authorize()` and
+  /// `phoneMatchSuffix()` in the website's source): an "@" means an email,
+  /// anything phone-shaped is matched against the end of the stored number, and
+  /// everything else is a username. This validates whichever form the member
+  /// typed rather than forcing one.
+  ///
+  /// **Every written form of the same number works**, because the server
+  /// compares significant digits from the end rather than rebuilding E.164:
+  /// 08111605155, 0811 160 5155, 2348111605155 and +234 811 160 5155 all reach
+  /// the same account. That is why nothing is normalised here — reformatting a
+  /// number in the client could only make it match less well.
   ///
   /// Deliberately looser than [UsernameRules.validate]: this is a lookup key
   /// for an account that already exists, and rejecting a legacy username that
-  /// predates the current rules would leave its owner unable to sign in with
-  /// a name the server still accepts.
+  /// predates the current rules would leave its owner unable to sign in with a
+  /// name the server still accepts. A username **may legally contain digits**,
+  /// which is exactly what broke phone sign-in on the website for a day, so
+  /// nothing here may treat "user1234567" as a number.
   static String? loginIdentifier(String? raw) {
     final value = (raw ?? '').trim();
-    if (value.isEmpty) return 'Enter your username or email address.';
+    if (value.isEmpty) {
+      return 'Enter your username, email or WhatsApp number.';
+    }
     if (value.contains('@')) return email(value);
     if (value.length < UsernameRules.minLength) {
-      return 'Enter your username or email address.';
+      return 'Enter your username, email or WhatsApp number.';
     }
     return null;
   }

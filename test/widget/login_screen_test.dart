@@ -28,7 +28,7 @@ void main() {
 
     expect(find.text('Welcome back'), findsOneWidget);
     expect(
-      find.widgetWithText(TextFormField, 'Username or email'),
+      find.widgetWithText(TextFormField, 'Username, email or WhatsApp number'),
       findsOneWidget,
     );
     expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
@@ -45,7 +45,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username or email'),
+      find.widgetWithText(TextFormField, 'Username, email or WhatsApp number'),
       'not-an-email@',
     );
     await tester.enterText(
@@ -64,7 +64,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username or email'),
+      find.widgetWithText(TextFormField, 'Username, email or WhatsApp number'),
       'member@example.com',
     );
     await tester.tap(find.widgetWithText(GradientButton, 'Sign in'));
@@ -83,7 +83,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username or email'),
+      find.widgetWithText(TextFormField, 'Username, email or WhatsApp number'),
       'member@example.com',
     );
     await tester.enterText(
@@ -106,7 +106,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username or email'),
+      find.widgetWithText(TextFormField, 'Username, email or WhatsApp number'),
       'zainab_lagos',
     );
     await tester.enterText(
@@ -127,7 +127,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username or email'),
+      find.widgetWithText(TextFormField, 'Username, email or WhatsApp number'),
       '  Member@Example.COM  ',
     );
     await tester.enterText(
@@ -152,7 +152,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username or email'),
+      find.widgetWithText(TextFormField, 'Username, email or WhatsApp number'),
       'member@example.com',
     );
     await tester.enterText(
@@ -177,7 +177,7 @@ void main() {
     await pumpLogin(tester, repository);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username or email'),
+      find.widgetWithText(TextFormField, 'Username, email or WhatsApp number'),
       'member@example.com',
     );
     await tester.enterText(

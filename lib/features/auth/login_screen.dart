@@ -157,8 +157,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     autofillHints: const <String>[AutofillHints.username],
                     autocorrect: false,
                     decoration: const InputDecoration(
-                      labelText: 'Username or email',
+                      labelText: 'Username, email or WhatsApp number',
                       hintText: 'yourname',
+                      helperText:
+                          'Any of the three. A number works however you write '
+                          'it.',
+                      helperMaxLines: 2,
                       prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
                     ),
                     validator: Validators.loginIdentifier,
@@ -197,10 +201,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onFieldSubmitted: (_) => _submit(),
                   ),
 
+                  // WhatsApp first, because every account created since
+                  // 2026-08-14 registered with a number and no email address --
+                  // /api/forgot-password has nothing to look those members up
+                  // by, which is most of the platform.
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () => context.push(AppRoutes.forgotPassword),
+                      onPressed: () => context.push(AppRoutes.whatsappReset),
                       child: const Text('Forgot password?'),
                     ),
                   ),

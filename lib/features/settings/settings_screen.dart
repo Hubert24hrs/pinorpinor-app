@@ -83,14 +83,29 @@ class SettingsScreen extends ConsumerWidget {
                   trailing: const Icon(Icons.open_in_new_rounded, size: 18),
                   onTap: () => LegalLinks.open(context, AppConfig.termsUrl),
                 ),
+                // Native since 2026-08-25. `POST /api/support` files against
+                // the signed-in account, which is a better answer than a web
+                // page the member would have to sign into again -- and the
+                // identity has to come from the session anyway, or anyone
+                // could file complaints as anyone else.
                 ListTile(
                   leading: const Icon(Icons.support_agent_rounded),
                   title: const Text('Contact support'),
-                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-                  onTap: () => LegalLinks.open(context, AppConfig.contactUrl),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => context.push(AppRoutes.support),
                 ),
 
                 const _SectionLabel(text: 'Account'),
+                ListTile(
+                  leading: const Icon(Icons.lock_reset_rounded),
+                  title: const Text('Change password'),
+                  subtitle: Text(
+                    'Set a new one. Required after a support reset.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => context.push(AppRoutes.settingsPassword),
+                ),
                 ListTile(
                   leading: const Icon(Icons.manage_accounts_outlined),
                   title: const Text('Account and deletion'),
