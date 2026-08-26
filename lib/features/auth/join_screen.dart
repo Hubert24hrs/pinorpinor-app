@@ -500,10 +500,12 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
             Text('How members reach you', style: theme.textTheme.headlineSmall),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              // Corrected 2026-08-25. This said the number stays private
-              // "until you accept a contact request", which stopped being true
-              // on 2026-08-23: nobody asks any more, and nothing is accepted.
-              // A member pays to open the chat, and both sides are charged.
+              // Corrected 2026-08-25. This used to describe the consent gate
+              // -- ask, wait, the owner decides -- which stopped existing on
+              // 2026-08-23. Nobody asks now and nothing is accepted: a member
+              // pays to open the chat, and both sides are charged. The old
+              // wording is deliberately not quoted here, so that grepping a
+              // built APK for it finds nothing.
               'Members never see your number. Somebody who wants to reach you '
               'on WhatsApp pays credits to open the chat.',
               style: theme.textTheme.bodyMedium,
