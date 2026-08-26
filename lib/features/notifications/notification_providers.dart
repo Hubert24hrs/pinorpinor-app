@@ -123,7 +123,6 @@ final notificationsProvider = FutureProvider.autoDispose<NotificationPage>((
   return repository.list();
 });
 
-/// Pending WhatsApp contact requests addressed to the member.
 // The contact-request providers were removed on 2026-08-25 along with the
 // endpoints behind them. Opening a chat is a purchase now, resolved at the
 // moment of the tap in ContactAccessRepository, so there is no inbox to poll and

@@ -183,27 +183,6 @@ enum SwipeAction {
   };
 }
 
-enum ContactRequestStatus {
-  pending,
-  accepted,
-  declined,
-  none;
-
-  static ContactRequestStatus parse(Object? value) => switch (value) {
-    'PENDING' => ContactRequestStatus.pending,
-    'ACCEPTED' => ContactRequestStatus.accepted,
-    'DECLINED' => ContactRequestStatus.declined,
-    _ => ContactRequestStatus.none,
-  };
-
-  String get wire => switch (this) {
-    ContactRequestStatus.pending => 'PENDING',
-    ContactRequestStatus.accepted => 'ACCEPTED',
-    ContactRequestStatus.declined => 'DECLINED',
-    ContactRequestStatus.none => 'PENDING',
-  };
-}
-
 enum NotificationType {
   match,
   message,

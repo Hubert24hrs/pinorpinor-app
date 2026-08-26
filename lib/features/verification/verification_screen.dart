@@ -229,8 +229,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                           hintText: account.phone ?? '+2348012345678',
                           helperText:
                               'Members never see this. It is used for '
-                              'verification, and for the WhatsApp handoff once '
-                              'you accept a contact request.',
+                              'verification, for signing in, and for the '
+                              'WhatsApp handoff when someone pays to open a '
+                              'chat with you.',
                           helperMaxLines: 3,
                         ),
                       ),

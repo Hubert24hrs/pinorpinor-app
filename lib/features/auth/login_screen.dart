@@ -112,8 +112,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Sign in to message members, manage your profile and reply '
-                    'to contact requests.',
+                    'Sign in to message members, manage your profile and open '
+                    'a WhatsApp chat.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: AppSpacing.xl),

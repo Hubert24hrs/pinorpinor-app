@@ -72,9 +72,9 @@ class NotificationsScreen extends ConsumerWidget {
                     EmptyView(
                       icon: Icons.notifications_none_rounded,
                       title: 'Nothing new',
-                      message:
-                          'Matches, messages and contact requests will '
-                          'appear here.',
+                      // No contact requests any more: the flow was removed on
+                      // 2026-08-23 and nothing creates one.
+                      message: 'Matches and messages will appear here.',
                     ),
                   ],
                 );

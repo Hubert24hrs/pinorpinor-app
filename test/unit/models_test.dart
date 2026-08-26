@@ -4,7 +4,6 @@ import 'package:pinorpinor_app/data/models/credits.dart';
 import 'package:pinorpinor_app/data/models/enums.dart';
 import 'package:pinorpinor_app/data/models/media_item.dart';
 import 'package:pinorpinor_app/data/models/messaging.dart';
-import 'package:pinorpinor_app/data/models/notifications.dart';
 import 'package:pinorpinor_app/data/models/profile.dart';
 import 'package:pinorpinor_app/data/models/settings.dart';
 
@@ -388,41 +387,6 @@ void main() {
         'lastMessage': <String, dynamic>{'content': 'gone', 'isDeleted': true},
       });
       expect(conversation.lastMessagePreview, 'Message deleted');
-    });
-  });
-
-  group('ContactRequest', () {
-    test('reads the counterparty from whichever side the API sent', () {
-      final received = ContactRequest.fromJson(<String, dynamic>{
-        'id': 'r1',
-        'status': 'PENDING',
-        'createdAt': '2026-08-13T10:00:00.000Z',
-        'message': 'Hi there',
-        'requester': <String, dynamic>{
-          'displayName': 'Ade',
-          'username': 'ade',
-          'media': <Map<String, dynamic>>[
-            <String, dynamic>{'storageUrl': 'https://cdn/avatar'},
-          ],
-        },
-      });
-
-      expect(received.counterpartName, 'Ade');
-      expect(received.counterpartAvatarUrl, 'https://cdn/avatar');
-      expect(received.isPending, isTrue);
-
-      final sent = ContactRequest.fromJson(<String, dynamic>{
-        'id': 'r2',
-        'status': 'ACCEPTED',
-        'createdAt': '2026-08-13T10:00:00.000Z',
-        'owner': <String, dynamic>{
-          'displayName': 'Zainab',
-          'username': 'zainab',
-        },
-      });
-
-      expect(sent.counterpartName, 'Zainab');
-      expect(sent.status, ContactRequestStatus.accepted);
     });
   });
 

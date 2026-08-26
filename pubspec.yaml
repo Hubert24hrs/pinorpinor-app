@@ -3,7 +3,7 @@ description: "Pinorpinor — the official mobile app for the Pinorpinor premium 
 publish_to: 'none'
 
 # versionName+versionCode. Bump the build number for every Play/TestFlight upload.
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.12.0-210.2.beta
