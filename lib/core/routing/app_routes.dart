@@ -64,6 +64,25 @@ class AppRoutes {
   static const settingsPassword = '/settings/password';
   static const support = '/support';
 
+  /// The website's editorial and legal pages, now native.
+  ///
+  /// These were [NavKind.website] entries until today: tapping "Safety &
+  /// Blacklist" left the app for a browser, which is the worst possible
+  /// handover for the one page a member reads when something has gone wrong.
+  /// The paths mirror the website's so an `https://pinorpinor.com/safety` link
+  /// opens the screen.
+  static const about = '/about';
+  static const faq = '/faq';
+  static const safety = '/safety';
+  static const privacy = '/privacy';
+  static const terms = '/terms';
+
+  /// Standalone abuse reporting, mirroring the website's `/report-abuse`.
+  ///
+  /// Distinct from the report sheet on a profile: this one takes a username,
+  /// so a member can report an account whose page they can no longer reach.
+  static const reportAbuse = '/report-abuse';
+
   /// Paths that require a session. Checked in the router's redirect, and
   /// re-checked by the backend on every request these screens make — the client
   /// guard is convenience, not security.
@@ -81,6 +100,11 @@ class AppRoutes {
     // Contact Us posts as the signed-in member: the identity comes from the
     // session, never the form, or anyone could file complaints as anyone else.
     support,
+    // `/api/report` calls requireAuth() and records the reporter's id, so a
+    // signed-out member would fill in a long account of what happened and
+    // lose it to a 401. The screen asks for a sign-in before anything is
+    // typed; this keeps a deep link from bypassing that.
+    reportAbuse,
     matches,
     // `/api/favorites` requires a session. Without this the screen loads for a
     // signed-out visitor, the request 401s, and `ApiClient` reports that as an

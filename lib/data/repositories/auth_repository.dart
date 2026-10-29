@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/constants/primary_services.dart';
 import '../../core/constants/service_features.dart';
 import '../../core/constants/services.dart';
@@ -286,16 +287,18 @@ class AuthRepository {
   /// service, and the 31-entry activity catalogue is offered in Edit Profile
   /// instead, which is what keeps signup short.
   ///
-  /// Two consequences unchanged from 2026-08-14:
+  /// One consequence unchanged from 2026-08-14:
   ///
-  /// - **There is no password-reset path for accounts created this way.**
-  ///   `/api/forgot-password` looks a member up by address and there is nothing
-  ///   to look up, so a forgotten password is a lost account. The join screen
-  ///   says so before the member commits.
   /// - **The country comes from the phone number**, resolved server-side by
   ///   `countryFromPhone`. Discovery scopes on `countryCode`, so a member whose
   ///   number does not resolve is discoverable by nobody until they set a
   ///   location in Edit Profile.
+  ///
+  /// Recovery is no longer a consequence: this used to say a forgotten password
+  /// meant a lost account, because `/api/forgot-password` looks a member up by
+  /// an address registration stopped collecting. The website shipped WhatsApp
+  /// recovery on 2026-08-22 and [resetPasswordWithWhatsApp] uses it, so the
+  /// number collected here is the recovery factor.
   ///
   /// **Rates are sent in MAJOR units, as typed.** `parseRateInput` converts them
   /// server-side against the currency the phone number resolves to; converting
@@ -362,8 +365,13 @@ class AuthRepository {
       primaryService: cleanPrimary,
     );
 
+    // Registration is the platform's heaviest transaction and the server gives
+    // it 60 seconds. Waiting past that is the whole point: an account created
+    // by a request this client abandoned is an account the member cannot sign
+    // in to and cannot register again.
     final json = await _api.postJson(
       '/api/member/join',
+      receiveTimeout: AppConfig.slowTransactionTimeout,
       body: <String, dynamic>{
         'username': UsernameRules.normalize(username),
         'password': password,

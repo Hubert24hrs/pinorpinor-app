@@ -129,6 +129,23 @@ const List<NavSection> kNavSections = <NavSection>[
         label: 'Exclusive',
         icon: Icons.workspace_premium_outlined,
         href: '/exclusive',
+        // Still a browser handover, and deliberately so. The page lists
+        // members with a LIVE BOOST, publicly, ordered by boostTier then
+        // boostActivatedAt, capped at 24 -- and it reads that straight from
+        // Prisma as a server component. No REST endpoint exposes it, and
+        // every candidate is wrong in a way a member could not see:
+        //
+        //   /api/public/profiles  orders by creditBalance, not boost
+        //   /api/spotlight        same, capped at 12
+        //   /api/discover         boost-ordered but requires a session AND
+        //                         excludes anyone already swiped on, so a
+        //                         boosted member would vanish from a page
+        //                         they had paid to appear on
+        //
+        // Filtering any of them on isRedHot yields a plausible screen holding
+        // the wrong people in the wrong order. A public
+        // `GET /api/public/exclusive` would close this in an afternoon; until
+        // the website has one, the real page is the honest answer.
         kind: NavKind.website,
       ),
     ],
@@ -230,6 +247,9 @@ const List<NavSection> kNavSections = <NavSection>[
         label: 'Reviews',
         icon: Icons.star_outline_rounded,
         href: '/reviews',
+        // Still a browser handover: `prisma.review` has no REST endpoint at
+        // all, so there is nothing for the app to read. Needs
+        // `GET /api/reviews` on the website first.
         kind: NavKind.website,
       ),
       NavItem(
@@ -253,13 +273,19 @@ const List<NavSection> kNavSections = <NavSection>[
         label: 'Safety & Blacklist',
         icon: Icons.verified_user_outlined,
         href: '/safety',
-        kind: NavKind.website,
+        // Native since 2026-10-29. This was the worst of the four browser
+        // handovers: a member opens the safety page when something has
+        // already gone wrong, and a page load is the last thing they need.
+        // Its "Report an account" button now reaches the in-app form.
+        kind: NavKind.native,
+        route: AppRoutes.safety,
       ),
       NavItem(
         label: 'FAQ',
         icon: Icons.help_outline_rounded,
         href: '/faq',
-        kind: NavKind.website,
+        kind: NavKind.native,
+        route: AppRoutes.faq,
       ),
       // Native since 2026-08-25: `POST /api/support` files a message against
       // the signed-in account, which is a better answer than opening a web page

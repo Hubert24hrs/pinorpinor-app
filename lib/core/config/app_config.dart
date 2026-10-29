@@ -32,6 +32,28 @@ class AppConfig {
   static const Duration connectTimeout = Duration(seconds: 20);
   static const Duration receiveTimeout = Duration(seconds: 30);
 
+  /// For the two endpoints that run a long interactive transaction, where
+  /// giving up early is worse than waiting.
+  ///
+  /// `/api/member/join` and `/api/profile/[username]/whatsapp` both export
+  /// `maxDuration = 60` on the website: registration is the heaviest
+  /// transaction on the platform, runs cold almost every time because nobody
+  /// signs up twice, and the WhatsApp unlock moves credits in both directions
+  /// inside one transaction.
+  ///
+  /// **This must stay above the server's own ceiling.** Below it, the client
+  /// abandons a request the server is still committing, and the member is told
+  /// something failed that in fact succeeded:
+  ///
+  /// - on join, the account exists, so the retry answers "username taken" and
+  ///   the member is locked out of a name that is already theirs;
+  /// - on the unlock, both wallets have already been charged 100 credits, and
+  ///   a member who pays again pays twice for one chat.
+  ///
+  /// Neither is recoverable from inside the app, and neither is visible to the
+  /// member as anything but a broken app.
+  static const Duration slowTransactionTimeout = Duration(seconds: 75);
+
   /// The API signs media URLs for one hour. Cached images are given a shorter
   /// life so a revoked photo stops rendering well before the signature dies.
   static const Duration mediaCacheTtl = Duration(minutes: 45);

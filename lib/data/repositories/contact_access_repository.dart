@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/constants/credits.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
@@ -69,6 +70,10 @@ class ContactAccessRepository {
         options: Options(
           followRedirects: false,
           validateStatus: (int? status) => status != null && status < 400,
+          // Both wallets are debited inside one transaction the server gives 60
+          // seconds. Timing out under that would tell a member the unlock
+          // failed after they had already paid for it.
+          receiveTimeout: AppConfig.slowTransactionTimeout,
         ),
       );
 

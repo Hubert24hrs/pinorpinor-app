@@ -9,9 +9,16 @@ import 'core/utils/app_log.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Portrait-first. Landscape is allowed on tablets, where the layouts adapt to
+  // All four orientations, on every form factor. Landscape earns its place on a
+  // tablet, where ContentContainer and the FormFactor breakpoints reflow into
   // the extra width; locking a 10-inch iPad to portrait would be worse than the
-  // reflow. Phones stay upright because every screen here is a vertical list.
+  // reflow.
+  //
+  // This is not a per-device rule and cannot be one from here: setPreferredOrientations
+  // is a single static list applied before the first frame, so there is no size
+  // to branch on yet. A phone therefore rotates too. Every screen is a vertical
+  // list, so it reflows rather than breaking -- but if phone-portrait-only is
+  // ever wanted, it belongs in a widget that watches MediaQuery, not here.
   SystemChrome.setPreferredOrientations(<DeviceOrientation>[
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../core/config/app_config.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/providers.dart';
 import '../../core/routing/app_routes.dart';
@@ -12,7 +11,6 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/settings.dart';
-import '../../shared/utils/legal_links.dart';
 import '../../shared/widgets/states.dart';
 import '../profile/account_providers.dart';
 
@@ -62,26 +60,51 @@ class SettingsScreen extends ConsumerWidget {
                   trailing: const Icon(Icons.chevron_right_rounded, size: 20),
                   onTap: () => context.push(AppRoutes.settingsBlocked),
                 ),
+                // In-app since 2026-10-29. These four were the last
+                // `open_in_new` arrows in Settings: a member tapping "Safety
+                // guidance" left for a browser, which is the wrong handover
+                // for the page somebody opens when something has gone wrong.
                 ListTile(
                   leading: const Icon(Icons.health_and_safety_outlined),
                   title: const Text('Safety guidance'),
-                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-                  onTap: () => LegalLinks.open(context, AppConfig.safetyUrl),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => context.push(AppRoutes.safety),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.flag_outlined),
+                  title: const Text('Report an account'),
+                  subtitle: Text(
+                    'By username, if you cannot reach their profile',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => context.push(AppRoutes.reportAbuse),
                 ),
 
                 const _SectionLabel(text: 'Legal'),
                 ListTile(
                   leading: const Icon(Icons.privacy_tip_outlined),
                   title: const Text('Privacy policy'),
-                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-                  onTap: () =>
-                      LegalLinks.open(context, AppConfig.privacyPolicyUrl),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => context.push(AppRoutes.privacy),
                 ),
                 ListTile(
                   leading: const Icon(Icons.gavel_rounded),
                   title: const Text('Terms of use'),
-                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-                  onTap: () => LegalLinks.open(context, AppConfig.termsUrl),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => context.push(AppRoutes.terms),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.help_outline_rounded),
+                  title: const Text('FAQ'),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => context.push(AppRoutes.faq),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info_outline_rounded),
+                  title: const Text('About Pinorpinor'),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => context.push(AppRoutes.about),
                 ),
                 // Native since 2026-08-25. `POST /api/support` files against
                 // the signed-in account, which is a better answer than a web

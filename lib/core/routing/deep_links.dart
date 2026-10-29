@@ -120,28 +120,46 @@ class DeepLinks {
       case 'matches':
         return AppRoutes.matches;
 
-      // Sections the website itself has not built, plus its marketing and legal
-      // pages. These stay on the web.
+      // Native since 2026-10-29. These five were in the decline list below,
+      // which was right while the app had no screen for them and is wrong now:
+      // an `https://pinorpinor.com/safety` link should open the safety screen,
+      // not a browser on top of the app that already contains it.
+      case 'about':
+        return AppRoutes.about;
+
+      case 'faq':
+        return AppRoutes.faq;
+
+      case 'safety':
+        return AppRoutes.safety;
+
+      case 'privacy':
+        return AppRoutes.privacy;
+
+      case 'terms':
+        return AppRoutes.terms;
+
+      case 'report-abuse':
+      case 'report_abuse':
+        return AppRoutes.reportAbuse;
+
+      // Sections the website itself has not built, plus the two whose data has
+      // no REST endpoint. These stay on the web.
       //
       // **Listing them explicitly is load-bearing**, not tidiness. Every one of
       // these is a valid username shape (`^[a-z0-9_]{3,20}$`), so without a case
       // here they fall through to the default branch and open a profile lookup
-      // for a member who does not exist — pinorpinor.com/faq would land on
-      // "profile not found". Any new website section needs adding here on the
-      // same day, and `deep_links_test.dart` fails if one is missed.
-      case 'about':
+      // for a member who does not exist. Any new website section needs adding
+      // here on the same day, and `deep_links_test.dart` fails if one is
+      // missed.
       case 'adverts':
       case 'events':
       case 'exclusive':
-      case 'faq':
       case 'feeds':
       case 'maintenance':
-      case 'privacy':
       case 'reviews':
       case 'rooms':
-      case 'safety':
       case 'contact':
-      case 'terms':
       case 'testimonials':
         return null;
 

@@ -116,13 +116,26 @@ class ApiClient {
     /// NextAuth's own routes read a form body rather than JSON, so the content
     /// type has to be selectable per call.
     String? contentType,
+
+    /// Overrides [AppConfig.receiveTimeout] for this call alone.
+    ///
+    /// Only for endpoints whose server-side budget exceeds the default -- see
+    /// [AppConfig.slowTransactionTimeout]. The default stays short so an
+    /// ordinary request cannot leave a member watching a spinner.
+    Duration? receiveTimeout,
   }) => _send<T>(
     () => _dio.post<T>(
       path,
       data: body,
       queryParameters: query,
       cancelToken: cancelToken,
-      options: contentType == null ? null : Options(contentType: contentType),
+      options: contentType == null && receiveTimeout == null
+          ? null
+          : Options(
+              contentType: contentType,
+              receiveTimeout: receiveTimeout,
+              sendTimeout: receiveTimeout,
+            ),
     ),
   );
 
@@ -157,7 +170,15 @@ class ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
-  }) async => _asMap(await post<dynamic>(path, body: body, query: query));
+    Duration? receiveTimeout,
+  }) async => _asMap(
+    await post<dynamic>(
+      path,
+      body: body,
+      query: query,
+      receiveTimeout: receiveTimeout,
+    ),
+  );
 
   Future<Map<String, dynamic>> patchJson(String path, {Object? body}) async =>
       _asMap(await patch<dynamic>(path, body: body));

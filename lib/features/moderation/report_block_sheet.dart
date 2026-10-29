@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/providers.dart';
 import '../../core/routing/app_routes.dart';
+import '../../core/constants/abuse_reasons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/repositories/safety_repository.dart';
@@ -161,7 +162,7 @@ class _ReportSheet extends StatefulWidget {
 }
 
 class _ReportSheetState extends State<_ReportSheet> {
-  ReportReason? _reason;
+  AbuseReason? _reason;
   final _detailsController = TextEditingController();
   bool _submitting = false;
 
@@ -184,7 +185,7 @@ class _ReportSheetState extends State<_ReportSheet> {
           .read(safetyRepositoryProvider)
           .report(
             reportedUserId: widget.userId,
-            reason: reason,
+            reasonId: reason.id,
             details: _detailsController.text,
           );
       navigator.pop();
@@ -231,13 +232,13 @@ class _ReportSheetState extends State<_ReportSheet> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              RadioGroup<ReportReason>(
+              RadioGroup<AbuseReason>(
                 groupValue: _reason,
                 onChanged: (value) => setState(() => _reason = value),
                 child: Column(
                   children: <Widget>[
-                    for (final reason in ReportReason.values)
-                      RadioListTile<ReportReason>(
+                    for (final reason in kAbuseReasons)
+                      RadioListTile<AbuseReason>(
                         value: reason,
                         contentPadding: EdgeInsets.zero,
                         title: Text(
@@ -258,7 +259,7 @@ class _ReportSheetState extends State<_ReportSheet> {
               TextField(
                 controller: _detailsController,
                 maxLines: 3,
-                maxLength: 1000,
+                maxLength: kReportDetailsMax,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
                   labelText: 'Anything else we should know? (optional)',

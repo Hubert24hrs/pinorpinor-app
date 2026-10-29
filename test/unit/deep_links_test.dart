@@ -74,24 +74,51 @@ void main() {
       );
     });
 
-    test('marketing and legal pages stay on the web', () {
-      // `live` was in this list until the app grew an Online Now screen. It is
-      // now claimed — see "the sections the app now owns" below. Anything that
-      // remains here is content the app genuinely does not reproduce.
-      for (final path in <String>[
-        'about',
-        'privacy',
-        'terms',
-        'safety',
-        'contact',
-        'faq',
-        'reviews',
-        'exclusive',
-      ]) {
+    test('only the pages with no app equivalent stay on the web', () {
+      // This list has shrunk twice. `live` left it when the app grew an Online
+      // Now screen; about, privacy, terms, safety and faq left it on
+      // 2026-10-29 when they became native screens. `contact` is native too,
+      // as /support.
+      //
+      // What remains is not "content the app does not reproduce" but content
+      // the app *cannot* reproduce, which is a narrower and more honest claim:
+      //
+      //   /exclusive  lists live-boosted members, read straight from Prisma by
+      //               a server component. No REST endpoint exposes that
+      //               population, and the three that come close each differ in
+      //               a way a member could not see — /api/public/profiles and
+      //               /api/spotlight sort by credit balance rather than boost,
+      //               and /api/discover needs a session and drops anyone
+      //               already swiped on, so a member would vanish from a page
+      //               they had paid to appear on.
+      //   /reviews    reads prisma.review, which has no route at all.
+      //
+      // Both become ten-line screens the day the website exposes them.
+      for (final path in <String>['reviews', 'exclusive']) {
         expect(
           DeepLinks.resolve(Uri.parse('https://pinorpinor.com/$path')),
           isNull,
-          reason: '/$path has no app equivalent',
+          reason: '/$path has no endpoint the app could read',
+        );
+      }
+    });
+
+    test('the editorial and legal pages now open in the app', () {
+      // Sending a member to a browser for the safety page was the worst of
+      // these: it is the page somebody opens when something has already gone
+      // wrong.
+      for (final (path, route) in <(String, String)>[
+        ('about', AppRoutes.about),
+        ('privacy', AppRoutes.privacy),
+        ('terms', AppRoutes.terms),
+        ('safety', AppRoutes.safety),
+        ('faq', AppRoutes.faq),
+        ('report-abuse', AppRoutes.reportAbuse),
+      ]) {
+        expect(
+          DeepLinks.resolve(Uri.parse('https://pinorpinor.com/$path')),
+          route,
+          reason: '/$path should open its screen, not a browser',
         );
       }
     });

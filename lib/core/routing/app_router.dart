@@ -27,6 +27,12 @@ import '../../features/notifications/notifications_screen.dart';
 import '../../features/profile/account_screen.dart';
 import '../../features/profile/edit_profile_screen.dart';
 import '../../features/profile/profile_detail_screen.dart';
+import '../../features/content/about_screen.dart';
+import '../../features/content/faq_screen.dart';
+import '../../features/content/privacy_screen.dart';
+import '../../features/content/safety_screen.dart';
+import '../../features/content/terms_screen.dart';
+import '../../features/moderation/report_abuse_screen.dart';
 import '../../features/settings/account_settings_screen.dart';
 import '../../features/settings/change_password_screen.dart';
 import '../../features/settings/settings_screen.dart';
@@ -253,6 +259,39 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.verification,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const VerificationScreen(),
+      ),
+
+      // The website's editorial and legal pages, and standalone reporting.
+      // Every one of these was a browser handover until today.
+      GoRoute(
+        path: AppRoutes.about,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.faq,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const FaqScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.safety,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SafetyScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.privacy,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PrivacyScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.terms,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const TermsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.reportAbuse,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ReportAbuseScreen(),
       ),
       GoRoute(
         path: AppRoutes.credits,

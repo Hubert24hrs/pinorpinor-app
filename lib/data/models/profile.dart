@@ -185,12 +185,16 @@ class ProfileSummary {
   /// `location` is the backend's own pre-composed string and wins when present:
   /// it is rebuilt server-side on every city or state change, so preferring the
   /// parts would risk showing a stale combination.
+  /// Each part is trimmed, which is the website's `formatLocation` behaviour
+  /// and not cosmetic: members really do type a trailing space, and
+  /// "Owerri , Imo, Nigeria" is what the website shipped a fix for on
+  /// 2026-08-27. The pre-composed `location` is trimmed for the same reason.
   String? get placeLabel {
-    if (location != null && location!.isNotEmpty) return location;
+    final composed = location?.trim();
+    if (composed != null && composed.isNotEmpty) return composed;
     final parts = <String>[
-      if (city != null && city!.isNotEmpty) city!,
-      if (state != null && state!.isNotEmpty) state!,
-      if (country != null && country!.isNotEmpty) country!,
+      for (final part in <String?>[city, state, country])
+        if (part != null && part.trim().isNotEmpty) part.trim(),
     ];
     return parts.isEmpty ? null : parts.join(', ');
   }

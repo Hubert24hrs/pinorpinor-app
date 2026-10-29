@@ -5,13 +5,83 @@
 > codebase. Trust the source over this file where they disagree, and update this
 > file when they do.
 
-Last verified: **2026-08-25**. Analyzer clean, **403 tests passing**, debug APK
-builds. Local: `C:\Users\HP\.gemini\antigravity-ide\scratch\pinorpinor-app`.
+Last verified: **2026-10-29**. Analyzer clean, **422 tests passing**, debug APK
+builds (1.0.0+3, arm64). Local: `C:\Users\HP\.gemini\antigravity-ide\scratch\pinorpinor-app`.
 Repository: `https://github.com/Hubert24hrs/pinorpinor-app`, branch `main`.
 
 ## Where the last session stopped
 
 Everything is committed and pushed; the working tree is clean.
+
+### 2026-10-29 — the website's own pages, brought in-app
+
+The brief was a carbon copy of the website. Mapping all 37 of its pages against
+the app's screens found **four menu entries that opened a browser** and three
+footer pages with no in-app route at all. Five are now native screens
+(`lib/features/content/`), plus a standalone Report Abuse form:
+
+| Website page | Was | Now |
+| --- | --- | --- |
+| `/safety` | browser | `SafetyScreen` — the worst of the four: it is the page somebody opens when something has already gone wrong |
+| `/faq` | browser | `FaqScreen`, with two answers corrected (below) |
+| `/about`, `/privacy`, `/terms` | browser, from Settings and signup | native screens |
+| `/report-abuse` | nothing | `ReportAbuseScreen`, reports by username |
+
+**Two sections stayed on the web, and the reason is load-bearing.**
+`/exclusive` lists live-boosted members and `/reviews` reads `prisma.review`;
+both are server components reading Prisma directly, and **no REST endpoint
+exposes either**. Every near-miss is wrong invisibly —
+`/api/public/profiles` and `/api/spotlight` sort by credit balance rather than
+boost, and `/api/discover` needs a session *and* drops anyone already swiped
+on, so a boosted member would vanish from a page they paid to appear on. A
+public `GET /api/public/exclusive` and a `GET /api/reviews` would make both
+ten-line screens. Do not "fix" them by filtering one of the endpoints above.
+
+### The bug that audit found: every report was filed as "other"
+
+`ReportReason.wire` returned the member-facing **label**, on the documented
+grounds that the route stored any string up to 100 characters. True when
+written. Then `/api/report` began passing the reason through
+`sanitizeAbuseReason`, which accepts only the seven ids in `src/lib/support.ts`
+and returns `DEFAULT_ABUSE_REASON` for anything else.
+
+Nothing failed. 200 back, member thanked, and the moderation queue showed
+**Something else** for every report the app had ever sent — underage reports
+among them, on an adult platform. `lib/core/constants/abuse_reasons.dart` now
+mirrors the ids and `test/unit/abuse_reasons_test.dart` reads the real
+TypeScript. It also found the app clamping `details` to 1000 against a 4000
+limit, truncating exactly the long accounts a moderator needs, and accepting
+descriptions shorter than the 10 the website refuses.
+
+### The website's copy contradicts itself, and the app does not reproduce it
+
+Three pages disagree about the same platform. The app follows the Safety page,
+which is the one that is correct, and says so in each file:
+
+| Claim | Where | Reality |
+| --- | --- | --- |
+| "only after you accept does a WhatsApp chat open" | FAQ | The consent flow was **deleted 2026-08-23**. A chat is bought, 100 credits each side |
+| Credits "pay for profile boosts" | FAQ | They are now what makes a member reachable at all; boosts are secondary |
+| media reviewed "prior to public display" | Terms §2, About | Publishes on insert since 2026-08-14; review is reactive |
+
+The FAQ's own header says a stale FAQ "is worse than no FAQ, because members
+make safety decisions from it". **The website needs these three fixes; that is
+the other repository's change.** `test/widget/content_screens_test.dart` fails
+if any content screen reintroduces the consent wording.
+
+### Also this session
+
+- **Registration and the WhatsApp unlock could time out mid-transaction.** The
+  website gives both `maxDuration = 60`; the app gave up at 30. A slow signup
+  the server committed looked like a failure, and the retry answered "username
+  taken"; on the unlock, both wallets were already charged.
+  `AppConfig.slowTransactionTimeout` (75s) now outwaits the server on exactly
+  those two calls.
+- `placeLabel` now trims each part, matching `formatLocation` — the website
+  shipped that fix on 2026-08-27 ("Owerri , Imo, Nigeria").
+- The 2026-08-25 session left four screens describing the deleted
+  contact-request flow. Corrected, and `ContactRepository` and its models
+  deleted — they called three endpoints that are 404s.
 
 **The website changes contracts under this app, and the app keeps building.**
 Four times in eleven days now. This is the single most important fact about
@@ -518,7 +588,7 @@ licences included), not fetched at runtime.
 
 ```bash
 flutter analyze     # expect: No issues found
-flutter test        # expect: 403 passing
+flutter test        # expect: 422 passing
 flutter build apk --debug
 ```
 
@@ -531,12 +601,13 @@ Tests found three genuine defects so far: two RenderFlex overflows (brand mark,
 sign-in footer) and the unawaited push. Keep the overflow assertions — they are
 cheap and they work.
 
-**Seven tests read the website's own source**, and they are the only defence
+**Eight tests read the website's own source**, and they are the only defence
 against the failure mode that has now broken this app three times:
 
 | Test | Reads | Fails when |
 | --- | --- | --- |
 | `join_contract_test.dart` | `api/member/join/route.ts` | the route can reject a field this app does not send |
+| `abuse_reasons_test.dart` | `lib/support.ts` | a reason id stops existing, or the details bounds move |
 | `navigation_test.dart` | `lib/navigation.ts` | the menu gains an entry |
 | `deep_links_test.dart` | `src/app/` | a section resolves to a profile lookup for its own slug |
 | `services_catalogue_test.dart`, `primary_services_test.dart`, `hookup_services_test.dart`, `live_sessions_test.dart`, `service_features_test.dart` | the matching `src/lib/*.ts` | any catalogue drifts, or an id becomes valid under two services |
@@ -558,7 +629,7 @@ reports on a live platform with real members would be worse than none.
 | Area | Status |
 | --- | --- |
 | `flutter analyze` | Clean |
-| `flutter test` | 403 passing |
+| `flutter test` | 422 passing |
 | Debug APK | Builds (98.5 MB, arm64, rebuilt 2026-08-25) |
 | Release `.aab` | **Not run** — needs the owner's `android/key.properties` |
 | iOS build | **Blocked** — needs macOS + Xcode |

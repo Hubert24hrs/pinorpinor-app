@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "pinorpinor-web",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "build/web"],
-      "port": 8765
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "8080", "--web-hostname", "127.0.0.1"],
+      "port": 8080
     }
   ]
 }

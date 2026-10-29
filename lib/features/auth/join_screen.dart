@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/config/app_config.dart';
 import '../../core/constants/countries.dart';
 import '../../core/constants/primary_services.dart';
 import '../../core/network/api_exception.dart';
@@ -23,7 +22,6 @@ import '../../data/repositories/auth_repository.dart';
 import '../profile/hookup_rates_form.dart';
 import '../profile/service_feature_picker.dart';
 import '../profile/primary_service_picker.dart';
-import '../../shared/utils/legal_links.dart';
 import '../../shared/widgets/brand.dart';
 import 'auth_controller.dart';
 
@@ -740,18 +738,22 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
               style: theme.textTheme.bodyMedium,
             ),
           ),
+          // In-app since 2026-10-29. These three used to open a browser --
+          // mid-signup, on the one screen where a member is being asked to
+          // accept the terms. Pushing a route keeps the half-filled form
+          // behind them, so reading the terms no longer costs the form.
           Wrap(
             children: <Widget>[
               TextButton(
-                onPressed: () => _openLegal(AppConfig.termsUrl),
+                onPressed: () => context.push(AppRoutes.terms),
                 child: const Text('Terms'),
               ),
               TextButton(
-                onPressed: () => _openLegal(AppConfig.privacyPolicyUrl),
+                onPressed: () => context.push(AppRoutes.privacy),
                 child: const Text('Privacy'),
               ),
               TextButton(
-                onPressed: () => _openLegal(AppConfig.safetyUrl),
+                onPressed: () => context.push(AppRoutes.safety),
                 child: const Text('Safety'),
               ),
             ],
@@ -773,10 +775,6 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _openLegal(String url) async {
-    await LegalLinks.open(context, url);
   }
 }
 

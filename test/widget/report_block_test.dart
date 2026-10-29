@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pinorpinor_app/core/constants/abuse_reasons.dart';
 import 'package:pinorpinor_app/core/network/api_client.dart';
 import 'package:pinorpinor_app/core/network/session_store.dart';
 import 'package:pinorpinor_app/core/providers.dart';
@@ -21,18 +22,23 @@ class _FakeSafetyRepository extends SafetyRepository {
         ApiClient(sessionStore: SessionStore(storage: FakeSecureStorage())),
       );
 
-  final List<(String, ReportReason, String?)> reports =
-      <(String, ReportReason, String?)>[];
+  /// `(reportedUserId, reasonId, details)`. The reason is captured as the id
+  /// that would go on the wire, which is the thing that was silently wrong:
+  /// the app sent labels, and `/api/report` filed every one of them as
+  /// `other`.
+  final List<(String?, String, String?)> reports =
+      <(String?, String, String?)>[];
   final List<String> blocks = <String>[];
   final List<String> unblocks = <String>[];
 
   @override
   Future<void> report({
-    required String reportedUserId,
-    required ReportReason reason,
+    required String reasonId,
+    String? reportedUserId,
+    String? reportedUsername,
     String? details,
   }) async {
-    reports.add((reportedUserId, reason, details));
+    reports.add((reportedUserId, reasonId, details));
   }
 
   @override
@@ -146,7 +152,7 @@ void main() {
 
     // The sheet scrolls: seven reasons plus a details field do not fit a
     // 600px-tall test surface, so each target is brought into view first.
-    final reason = find.text(ReportReason.underage.label);
+    final reason = find.text('I believe this person is under 18');
     await tester.ensureVisible(reason);
     await tester.pumpAndSettle();
     await tester.tap(reason);
@@ -160,7 +166,10 @@ void main() {
 
     expect(safety.reports, hasLength(1));
     expect(safety.reports.single.$1, 'target-user');
-    expect(safety.reports.single.$2, ReportReason.underage);
+    // The id, not the label. `sanitizeAbuseReason` on the route accepts only
+    // these seven ids and rewrites anything else to `other`, so sending the
+    // label lost the reason entirely.
+    expect(safety.reports.single.$2, 'underage');
   });
 
   testWidgets('offers every documented reason', (tester) async {
@@ -170,11 +179,11 @@ void main() {
     await tester.tap(find.text('Report this profile'));
     await tester.pumpAndSettle();
 
-    for (final reason in ReportReason.values) {
+    for (final reason in kAbuseReasons) {
       expect(
         find.text(reason.label),
         findsOneWidget,
-        reason: '${reason.name} must be offered',
+        reason: '${reason.id} must be offered',
       );
     }
   });
