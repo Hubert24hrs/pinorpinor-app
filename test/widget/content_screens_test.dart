@@ -188,6 +188,43 @@ void main() {
     });
   });
 
+  group('nothing overflows on the narrowest phone', () {
+    // The suite has already caught two real RenderFlex overflows (the brand
+    // mark and the sign-in footer). These screens are the widest-ranging copy
+    // in the app -- long headings, a gold pill beside text, bullet rows with a
+    // bold lead-in -- and all of it was transcribed from a layout that had a
+    // desktop breakpoint to fall back on.
+    //
+    // 320x640 is the floor the theme's text-scale clamp is set for.
+    const Size narrow = Size(320, 640);
+
+    for (final (name, build) in <(String, Widget Function())>[
+      ('About', AboutScreen.new),
+      ('Safety', SafetyScreen.new),
+      ('FAQ', FaqScreen.new),
+      ('Privacy', PrivacyScreen.new),
+      ('Terms', TermsScreen.new),
+    ]) {
+      testWidgets('$name lays out at 320px', (tester) async {
+        await tester.pumpScreen(build(), surfaceSize: narrow);
+        expect(tester.takeException(), isNull);
+
+        // Scroll the whole page: an overflow further down would otherwise go
+        // unseen, since a ListView only lays out what it shows.
+        final scrollable = find.byType(Scrollable).first;
+        for (var i = 0; i < 12; i++) {
+          await tester.drag(scrollable, const Offset(0, -400));
+          await tester.pump();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: '$name overflowed after scrolling',
+          );
+        }
+      });
+    }
+  });
+
   group('transcription is faithful where it is meant to be', () {
     final File safety = File('../pinorpinor/src/app/safety/page.tsx');
 
