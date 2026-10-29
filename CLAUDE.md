@@ -6,7 +6,7 @@
 > file when they do.
 
 Last verified: **2026-10-29**. Analyzer clean, **422 tests passing**, debug APK
-builds (1.0.0+3, arm64). Local: `C:\Users\HP\.gemini\antigravity-ide\scratch\pinorpinor-app`.
+built and verified (1.0.0+3, **universal**, 171 MB). Local: `C:\Users\HP\.gemini\antigravity-ide\scratch\pinorpinor-app`.
 Repository: `https://github.com/Hubert24hrs/pinorpinor-app`, branch `main`.
 
 ## Where the last session stopped
@@ -36,6 +36,34 @@ boost, and `/api/discover` needs a session *and* drops anyone already swiped
 on, so a boosted member would vanish from a page they paid to appear on. A
 public `GET /api/public/exclusive` and a `GET /api/reviews` would make both
 ten-line screens. Do not "fix" them by filtering one of the endpoints above.
+
+### Live probing found `/api/ladies` returning 500 in production
+
+Exercised on 2026-10-29 against `https://pinorpinor.com`:
+
+| Endpoint | Result |
+| --- | --- |
+| `/api/public/profiles`, `/api/spotlight`, `/api/public/locations`, `/api/public/online` | 200 |
+| `POST /api/report` unauthenticated | 401 — confirms the sign-in gate on the new screen |
+| **`/api/ladies`** | **500 on every parameter combination** |
+
+The body is the route's own catch-all, `{"error":"Failed to fetch ladies"}`, and
+it is the endpoint behind `ladiesProvider` and the home rail. The app degrades
+correctly — `ErrorView` with a retry, not a crash — so this is **the website's
+defect, not the app's**, and it needs that repository's Vercel logs to pin.
+
+Ruled out already: `state` exists in the deployed schema (the *working*
+`/api/public/profiles` selects it too), and `prisma.review` is healthy (the
+`/reviews` page serves 200, so the `_count: { reviewsReceived }` select is not
+it). `resolveViewerCountry` reads safely for an anonymous caller.
+
+`/api/spotlight` returns `{faceOfTheDay: null, topProfiles: [], scope: null}`
+and the app parses that null-safely. Production still lists no members, so
+discovery is empty for the reason it has always been.
+
+**Signed-in flows remain unexercised against production.** Registering real
+accounts and spending real credits on a live platform with real members would
+leave real rows behind, which this file already rules out.
 
 ### The bug that audit found: every report was filed as "other"
 
@@ -630,7 +658,7 @@ reports on a live platform with real members would be worse than none.
 | --- | --- |
 | `flutter analyze` | Clean |
 | `flutter test` | 422 passing |
-| Debug APK | Builds (98.5 MB, arm64, rebuilt 2026-08-25) |
+| Debug APK | **Built 2026-10-29** — 1.0.0+3, universal (arm64-v8a, armeabi-v7a, x86_64), 171 MB. Zip verified: 602 entries, 19 dex, `kernel_blob.bin` 83.5 MB, both brand fonts, `MainActivity` package matches `namespace` |
 | Release `.aab` | **Not run** — needs the owner's `android/key.properties` |
 | iOS build | **Blocked** — needs macOS + Xcode |
 | On device — install | **Confirmed.** The APK installs on the owner's phone |
